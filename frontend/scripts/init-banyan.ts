@@ -1,14 +1,14 @@
 import { Connection, Keypair, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction } from '@solana/web3.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { deserialize, serialize } from 'borsh';
 
 // Load Program ID
-const ID_FILE = path.join(__dirname, '../../program-id-banyan.json');
+// Use the main program-ids.json which is more reliable
+const ID_FILE = path.join(__dirname, '../../program-ids.json');
 
 async function main() {
     if (!fs.existsSync(ID_FILE)) {
-        console.error("❌ Program ID file not found. Run deploy-banyan.sh first.");
+        console.error("❌ Program ID file not found at " + ID_FILE);
         process.exit(1);
     }
 
@@ -20,15 +20,15 @@ async function main() {
     }
     const PROGRAM_ID = new PublicKey(programIdStr);
 
-    console.log(`🌿 Initializing Great Banyan Tree on Localnet...`);
-    console.log(`PAD: ${PROGRAM_ID.toString()}`);
+    console.log(`🌿 Initializing Great Banyan Global Singleton on Localnet...`);
+    console.log(`ProgID: ${PROGRAM_ID.toString()} `);
 
     // Connection
     const connection = new Connection("http://127.0.0.1:8899", "confirmed");
 
     // Payer
-    // Try to load default solana conf
     const home = process.env.HOME || process.env.USERPROFILE;
+    // Default solana config usually at ~/.config/solana/id.json
     const keyPath = path.join(home!, '.config/solana/id.json');
 
     let payer: Keypair;
@@ -42,40 +42,100 @@ async function main() {
         await connection.confirmTransaction(sig);
     }
 
-    console.log(`Wallet: ${payer.publicKey.toString()}`);
+    console.log(`Wallet: ${payer.publicKey.toString()} `);
 
-    // PDAs
-    const [treePda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("tree"), payer.publicKey.toBuffer()],
+    // 1. Initialize Game Manager
+    // Seeds: "manager"
+    const [managerPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("manager")],
         PROGRAM_ID
     );
+    console.log(`Manager PDA: ${managerPda.toString()} `);
+
+    // Check if manager exists
+    const managerInfo = await connection.getAccountInfo(managerPda);
+    if (managerInfo) {
+        console.log("✅ Game Manager already initialized.");
+    } else {
+        console.log("Creating Game Manager...");
+        // Instruction: InitializeGame = 0 (Confirmed in lib.rs)
+        const data = Buffer.alloc(1);
+        data.writeUInt8(0, 0); // Enum variant 0
+
+        const tx = new Transaction().add({
+            keys: [
+                { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+                { pubkey: managerPda, isSigner: false, isWritable: true },
+                { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+            ],
+            programId: PROGRAM_ID,
+            data: data,
+        });
+
+        try {
+            const sig = await sendAndConfirmTransaction(connection, tx, [payer]);
+            console.log(`✅ Game Manager Initialized! Tx: ${sig} `);
+        } catch (e) {
+            console.error("❌ Manager Initialization failed:", e);
+            // If manager failed, maybe it exists but we missed it? Proceed with caution.
+            return;
+        }
+    }
+
+    // 2. Initialize Tree for Epoch 0
+    // We assume current epoch is 0 if just initialized. 
+    // If it was already initialized, we should read it.
+    let currentEpoch = 0n;
+    // Re-fetch manager info just in case we just created it
+    const updatedManagerInfo = await connection.getAccountInfo(managerPda);
+    if (updatedManagerInfo) {
+        // Layout: currentEpoch(8), prizePool(8)
+        const view = new DataView(updatedManagerInfo.data.buffer, updatedManagerInfo.data.byteOffset, updatedManagerInfo.data.byteLength);
+        currentEpoch = view.getBigUint64(0, true);
+    }
+    console.log(`Current Epoch: ${currentEpoch} `);
+
+    const epochBuffer = Buffer.alloc(8);
+    epochBuffer.writeBigUInt64LE(currentEpoch);
+
+    const [treePda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("tree"), epochBuffer],
+        PROGRAM_ID
+    );
+
+    // Root bud for this tree
     const [rootBudPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("bud"), treePda.toBuffer(), Buffer.from("root")],
         PROGRAM_ID
     );
 
-    console.log(`Tree PDA: ${treePda.toString()}`);
-    console.log(`Root Bud PDA: ${rootBudPda.toString()}`);
+    console.log(`Tree PDA(Epoch ${currentEpoch}): ${treePda.toString()} `);
 
-    // Check if already initialized
-    const info = await connection.getAccountInfo(treePda);
-    if (info) {
-        console.log("✅ Tree already initialized.");
+    const treeInfo = await connection.getAccountInfo(treePda);
+    if (treeInfo) {
+        console.log("✅ Tree for current epoch already initialized.");
         return;
     }
 
-    // Initialize Instruction
-    // struct InitializeTree { root: [u8;32], max_depth: u8, vitality_required_base: u64 }
-    // Enum variant 0
+    console.log("Initializing Tree for current epoch...");
 
-    const rootHash = Buffer.alloc(32); // Empty root
+    // Instruction: InitializeTree = 1 (Confirmed in lib.rs)
+    // struct InitializeTree { root: [u8; 32], max_depth: u8, vitality_required_base: u64 }
+
+    // Data Layout:
+    // [0] = Variant (1)
+    // [1..33] = Root Hash (32 bytes)
+    // [33] = Max Depth (1 byte)
+    // [34..42] = Vitality Required Base (8 bytes)
+
+    const rootHash = Buffer.alloc(32);
+    rootBudPda.toBuffer().copy(rootHash); // Fix: Use the actual Root Bud PDA address
     const maxDepth = 5;
     const vitalityReq = 100n; // u64
 
-    // Manual serialization based on layout: [0 (variant), root(32), max_depth(1), vitality(8)]
     const data = Buffer.alloc(1 + 32 + 1 + 8);
     let offset = 0;
-    data.writeUInt8(0, offset); // Variant
+    data.writeUInt8(1, offset); // Variant 1
     offset += 1;
     rootHash.copy(data, offset);
     offset += 32;
@@ -83,9 +143,12 @@ async function main() {
     offset += 1;
     data.writeBigUInt64LE(vitalityReq, offset);
 
+    // Accounts for InitializeTree:
+    // Payer, Manager, TreeState, RootBud, SystemProgram
     const tx = new Transaction().add({
         keys: [
             { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+            { pubkey: managerPda, isSigner: false, isWritable: true },
             { pubkey: treePda, isSigner: false, isWritable: true },
             { pubkey: rootBudPda, isSigner: false, isWritable: true },
             { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
@@ -96,9 +159,9 @@ async function main() {
 
     try {
         const sig = await sendAndConfirmTransaction(connection, tx, [payer]);
-        console.log(`✅ Tree Initialized! Tx: ${sig}`);
+        console.log(`✅ Tree Initialized! Tx: ${sig} `);
     } catch (e) {
-        console.error("❌ Initialization failed:", e);
+        console.error("❌ Tree Initialization failed:", e);
     }
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { keccak_256 } from 'js-sha3';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
-import { deserialize } from 'borsh';
 import { theme } from '../../theme';
 import { TreeVisualizer } from './TreeVisualizer';
 import { BudModal } from './BudModal';
@@ -9,110 +9,18 @@ import {
     findTreePda,
     findBudPda,
     findChildBudPda,
+    findGameManagerPda,
     BudAccount,
     TreeAccount,
+    GameManagerAccount,
     PROGRAM_ID
 } from './utils';
-
-// Borsh Schemas
-class TreeState {
-    root: number[] = [];
-    max_depth: number = 0;
-    total_pot: number | bigint = 0;
-    authority: number[] = [];
-    vitality_required_base: number | bigint = 0;
-
-    constructor(fields: any) {
-        if (fields) {
-            this.root = fields.root;
-            this.max_depth = fields.max_depth;
-            this.total_pot = fields.total_pot;
-            this.authority = fields.authority;
-            this.vitality_required_base = fields.vitality_required_base;
-        }
-    }
-}
-
-class Bud {
-    parent: number[] = [];
-    depth: number = 0;
-    vitality_current: number | bigint = 0;
-    vitality_required: number | bigint = 0;
-    is_bloomed: boolean = false;
-    is_fruit: boolean = false;
-    nurturers: number[][] = [];
-
-    constructor(fields: any) {
-        if (fields) {
-            this.parent = fields.parent;
-            this.depth = fields.depth;
-            this.vitality_current = fields.vitality_current;
-            this.vitality_required = fields.vitality_required;
-            this.is_bloomed = fields.is_bloomed;
-            this.is_fruit = fields.is_fruit;
-            this.nurturers = fields.nurturers;
-        }
-    }
-}
-
-const TreeSchema = new Map([
-    [TreeState, {
-        kind: 'struct',
-        fields: [
-            ['root', [32]],
-            ['max_depth', 'u8'],
-            ['total_pot', 'u64'],
-            ['authority', [32]],
-            ['vitality_required_base', 'u64']
-        ]
-    }]
-]);
-
-const BudSchema = new Map([
-    [Bud, {
-        kind: 'struct',
-        fields: [
-            ['parent', [32]],
-            ['depth', 'u8'],
-            ['vitality_current', 'u64'],
-            ['vitality_required', 'u64'],
-            ['is_bloomed', 'u8'], // bool as u8 in borsh used by pinocchio sometimes, or just bool? 
-            // In lib.rs it is `bool`. Borsh handles bool as 1 byte usually.
-            // Let's restart: Rust `bool` is `u8` (0 or 1).
-            // HOWEVER, borsh-js sometimes has issues if we don't specify 'u8' explicitly for bools if simple 'bool' fails.
-            // Standard borsh-js supports 'u8' for bools if mapped manually. 
-            // Let's try standard types first.
-            // Wait, standard borsh uses 'u8' for bool? No.
-            ['is_fruit', 'u8'],
-            ['nurturers', [[32]]] // Vec<[u8; 32]>
-        ]
-    }]
-]);
-
-// Actually, let's fix the schema. Rust `bool` -> `u8` mapping is safer for custom decoding if we encounter issues.
-// But let's try to align with standard Borsh.
-// Pinocchio might use standard Borsh.
-// Let's use a simpler custom deserializer if needed or just `any` for now if schema is tricky.
-// Actually, I can just use `borsh.deserialize` with a flexible schema.
-
-// REVISED SCHEMAS
-const TREE_SCHEMA = {
-    struct: {
-        root: { array: { type: 'u8', len: 32 } },
-        max_depth: 'u8',
-        total_pot: 'u64',
-        authority: { array: { type: 'u8', len: 32 } },
-        vitality_required_base: 'u64'
-    }
-};
-// Managing schemas in JS manually is pain. Let's try to do manual parsing or simple buffer reading if struct is simple.
-// Or use the `borsh` library correctly.
-// Let's stick to the class-based approach which `borsh` library expects.
 
 export const GreatBanyanGame: React.FC = () => {
     const { connection } = useConnection();
     const { publicKey, sendTransaction } = useWallet();
 
+    const [gameManager, setGameManager] = useState<GameManagerAccount | null>(null);
     const [treeState, setTreeState] = useState<TreeAccount | null>(null);
     const [buds, setBuds] = useState<Map<string, BudAccount>>(new Map());
     const [rootAddress, setRootAddress] = useState<PublicKey | null>(null);
@@ -120,77 +28,90 @@ export const GreatBanyanGame: React.FC = () => {
     const [selectedBudAddress, setSelectedBudAddress] = useState<PublicKey | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // 1. Fetch Tree State
-    // We need an authority to find the tree.
-    // CAUTION: The authority is the deployer or a specific key.
-    // If we don't know the authority, we can't find the PDA.
-    // We might need to ask the user to input the authority or hardcode a "Game Master" key.
-    // For now, let's assume the CURRENT USER is the authority for testing (if they deployed it).
-    // OR we can't find it.
-
-    // TEMPORARY: Use a hardcoded well-known authority or allow user to set it.
-    // Let's fallback to current wallet for creating/viewing if they are the creator.
-    // Or ask for input.
-    // Better: Allow entering tree authority in UI if not found.
-    const [authorityInput, setAuthorityInput] = useState('');
-    const [treeAuthority, setTreeAuthority] = useState<PublicKey | null>(null);
-
-    // Initial load try
-    useEffect(() => {
-        if (publicKey && !treeAuthority) {
-            // Default to self for dev
-            setTreeAuthority(publicKey);
-            setAuthorityInput(publicKey.toString());
-        }
-    }, [publicKey]);
-
-    const fetchTree = useCallback(async () => {
-        if (!treeAuthority || !connection) return;
-
+    // 1. Fetch Game Manager
+    const fetchGameManager = useCallback(async () => {
+        if (!connection) return;
         try {
-            const [treePda] = findTreePda(treeAuthority);
-            const accountInfo = await connection.getAccountInfo(treePda);
-
-            if (!accountInfo) {
-                console.log("Tree account not found");
+            const [managerPda] = findGameManagerPda();
+            const info = await connection.getAccountInfo(managerPda);
+            if (!info) {
+                console.log("Game Manager not found (Game might not be initialized)");
                 return;
             }
 
-            // Manual deserialize for now to avoid schema hell
+            // Layout: current_epoch (u64), prize_pool (u64)
+            const data = info.data;
+            const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            const currentEpoch = view.getBigUint64(0, true);
+            const prizePool = view.getBigUint64(8, true);
+
+            setGameManager({ currentEpoch, prizePool });
+
+        } catch (e) {
+            console.error("Failed to fetch game manager", e);
+        }
+    }, [connection]);
+
+    // 2. Fetch Tree State (depends on GameManager)
+    const fetchTree = useCallback(async () => {
+        if (!gameManager || !connection) return;
+
+        try {
+            const [treePda] = findTreePda(gameManager.currentEpoch);
+            const accountInfo = await connection.getAccountInfo(treePda);
+
+            if (!accountInfo) {
+                console.log("Tree account not found for epoch", gameManager.currentEpoch.toString());
+                return;
+            }
+
             // Layout: 
             // root: 32
             // max_depth: 1
-            // total_pot: 8
-            // authority: 32
-            // vitality_req: 8
+            // total_pot: 8 (Removed in refactor? No, TreeState struct might still have it or removed? 
+            // Checked lib.rs: TreeState struct has: root, max_depth, authority, vitality_required_base. 
+            // total_pot MOVED to GameManager.
+            // Let's re-check lib.rs struct definition to be safe.
+            // src/lib.rs:
+            // pub struct TreeState {
+            //     pub root: [u8; 32],
+            //     pub max_depth: u8,
+            //     pub authority: [u8; 32],
+            //     pub vitality_required_base: u64,
+            // }
+            // So total_pot is GONE.
+
             const data = accountInfo.data;
-            const root = Array.from(data.subarray(0, 32));
-            const maxDepth = data[32];
-            // ... parsing is tedious. 
-            // In a real app we'd use a proper IDL or schema.
-            // Let's assume purely visual for now and not crash if parse fails
+            let offset = 0;
+            const root = Array.from(data.subarray(offset, offset + 32));
+            offset += 32;
+            const maxDepth = data[offset];
+            offset += 1;
+            const authority = new PublicKey(data.subarray(offset, offset + 32));
+            offset += 32;
+
+            const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            // offset is 32 + 1 + 32 = 65
+            const vitalityRequiredBase = Number(view.getBigUint64(offset, true));
 
             setTreeState({
                 root,
                 maxDepth,
-                totalPot: 0, // placeholder
-                authority: treeAuthority,
-                vitalityRequiredBase: 0 // placeholder
+                totalPot: 0, // Field deprecated/moved
+                authority,
+                vitalityRequiredBase
             });
 
             // Find Root Bud
             const [rootBudPda] = findBudPda(treePda, 'root');
             setRootAddress(rootBudPda);
 
-            // Start fetching buds recursively?
-            // Or just fetch root and let user expand?
-            // Let's fetch root first.
             fetchBud(rootBudPda);
 
         } catch (e) {
             console.error("Failed to fetch tree", e);
         }
-    }, [connection, treeAuthority]);
+    }, [connection, gameManager]);
 
     // Fetch Bud Helper
     const fetchBud = async (address: PublicKey) => {
@@ -214,16 +135,17 @@ export const GreatBanyanGame: React.FC = () => {
             offset += 32;
             const depth = data[offset];
             offset += 1;
-            const vitalityCurrent = Number(data.readBigUInt64LE(offset));
+
+            const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            // Use BigUint64 for deserialization
+            const vitalityCurrent = Number(view.getBigUint64(offset, true));
             offset += 8;
-            const vitalityRequired = Number(data.readBigUInt64LE(offset));
+            const vitalityRequired = Number(view.getBigUint64(offset, true));
             offset += 8;
             const isBloomed = data[offset] !== 0;
             offset += 1;
             const isFruit = data[offset] !== 0;
             offset += 1;
-
-            // We ignore nurturers for visualization
 
             const budAcc: BudAccount = {
                 parent,
@@ -254,43 +176,102 @@ export const GreatBanyanGame: React.FC = () => {
     // Refresh loop
     useEffect(() => {
         const interval = setInterval(() => {
-            if (treeAuthority) fetchTree();
+            fetchGameManager();
+            if (gameManager) fetchTree();
         }, 5000);
         return () => clearInterval(interval);
-    }, [fetchTree, treeAuthority]);
+    }, [fetchGameManager, fetchTree, gameManager]);
 
-    // Initial manual fetch
+    // Initial load
     useEffect(() => {
-        if (treeAuthority) fetchTree();
-    }, [treeAuthority]);
+        fetchGameManager();
+    }, [fetchGameManager]);
+
+    useEffect(() => {
+        if (gameManager) fetchTree();
+    }, [gameManager, fetchTree]);
 
 
     const handleNurture = async (essence: string) => {
         if (!selectedBudAddress || !publicKey) return;
         setIsProcessing(true);
         try {
-            // Construct Instruction manually
-            // 4 bytes discriminator? No, standard borsh enum likely?
-            // Rust enum `BanyanInstruction`:
-            // InitializeTree = 0
-            // NurtureBud = 1
-            // BloomBud = 2
+            // ... (inside handleNurture) ...
 
-            // NurtureBud data: [1, essence_len, essence_bytes...]
+            // 1. Get Fresh Block/Slot for Mining
+            const slot = await connection.getSlot();
 
-            const essenceBytes = Buffer.from(essence, 'utf8');
-            const data = Buffer.alloc(1 + 4 + essenceBytes.length);
-            data.writeUInt8(1, 0); // Enum variant 1
-            data.writeUInt32LE(essenceBytes.length, 1);
-            data.write(essence, 5);
+            // 2. Mine! (Client-Side PoW)
+            // Goal: Find nonce where Hash(essence + bud + nurturer + slot + nonce) has leading zeros.
+            // Tier 0 (No zeros): 1 Vitality
+            // Tier 1 (1 byte zero): 50 Vitality
+            // Tier 2 (2 bytes zero): 500 Vitality
 
-            // Accounts: nurturer, tree_state, bud, system_program
-            const [treePda] = findTreePda(treeAuthority!);
+            let bestNonce = 0n;
+            let bestGain = 1;
+            const maxIterations = 100000; // 100k hashes is fast in JS
+
+            // Pre-compute fixed parts of hash input to speed up mining
+            // Input: essence(bytes) + bud(32) + nurturer(32) + slot(8) + nonce(8)
+            const encoder = new TextEncoder();
+            const essenceBytes = encoder.encode(essence);
+            const budBytes = selectedBudAddress.toBuffer();
+            const nurturerBytes = publicKey.toBuffer();
+            const slotBytes = new Uint8Array(8);
+            new DataView(slotBytes.buffer).setBigUint64(0, BigInt(slot), true); // LE
+
+            const totalLen = essenceBytes.length + 32 + 32 + 8 + 8;
+            const miningBuffer = new Uint8Array(totalLen);
+            let offset = 0;
+            miningBuffer.set(essenceBytes, offset); offset += essenceBytes.length;
+            miningBuffer.set(budBytes, offset); offset += 32;
+            miningBuffer.set(nurturerBytes, offset); offset += 32;
+            miningBuffer.set(slotBytes, offset); offset += 8;
+            // Nonce is at the end (last 8 bytes)
+
+            console.log(`Mining for slot ${slot}...`);
+            const miningView = new DataView(miningBuffer.buffer);
+            const nonceOffset = totalLen - 8;
+
+            const start = performance.now();
+            for (let i = 0; i < maxIterations; i++) {
+                const nonce = BigInt(i);
+                miningView.setBigUint64(nonceOffset, nonce, true); // LE
+
+                // Hash
+                const hashParams = keccak_256.array(miningBuffer); // Returns number[]
+                // Calculate Gain: (h[0]%3) + (h[1]%3) + 1
+                const g = (hashParams[0] % 3) + (hashParams[1] % 3) + 1;
+
+                if (g > bestGain) {
+                    bestGain = g;
+                    bestNonce = nonce;
+                    if (g === 5) break; // Max possible, stop
+                }
+            }
+            const end = performance.now();
+            console.log(`Mining complete in ${(end - start).toFixed(2)}ms. Found Gain ${bestGain} with nonce ${bestNonce}`);
+
+            // Construct Transaction Data
+            // [2, nonce(8), mined_slot(8), essence_len(4), essence_bytes...]
+
+            const dataLen = 1 + 8 + 8 + 4 + essenceBytes.length;
+            const data = new Uint8Array(dataLen);
+            const view = new DataView(data.buffer);
+
+            view.setUint8(0, 2); // Variant 2 (Nurture)
+            view.setBigUint64(1, bestNonce, true); // Nonce
+            view.setBigUint64(9, BigInt(slot), true); // Mined Slot
+            view.setUint32(17, essenceBytes.length, true); // Essence Len
+            data.set(essenceBytes, 21);
+
+            // Accounts: [payer, manager, bud, system_program]
+            const [managerPda] = findGameManagerPda();
 
             const tx = new Transaction().add({
                 keys: [
                     { pubkey: publicKey, isSigner: true, isWritable: true },
-                    { pubkey: treePda, isSigner: false, isWritable: true },
+                    { pubkey: managerPda, isSigner: false, isWritable: true },
                     { pubkey: selectedBudAddress, isSigner: false, isWritable: true },
                     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
                 ],
@@ -299,10 +280,12 @@ export const GreatBanyanGame: React.FC = () => {
             });
 
             const sig = await sendTransaction(tx, connection);
-            console.log("Nurture tx:", sig);
 
-            // Optimistic update or wait for refresh
+            // Optimistic update
             await connection.confirmTransaction(sig, 'confirmed');
+
+            // Re-fetch everything
+            fetchGameManager();
             fetchBud(selectedBudAddress);
 
         } catch (e) {
@@ -310,7 +293,6 @@ export const GreatBanyanGame: React.FC = () => {
             alert("Nurture failed: " + (e as any).message);
         } finally {
             setIsProcessing(false);
-            // Don't close modal, just refresh
         }
     };
 
@@ -318,68 +300,91 @@ export const GreatBanyanGame: React.FC = () => {
         if (!selectedBudAddress || !publicKey) return;
         setIsProcessing(true);
         try {
-            // bloom logic...
-            // Variant 2
-            // Needs proof... that's hard.
-            // If tree is empty (root only), proof is empty?
+            // BloomBud: Variant 3
+            // Data: [3, proof_len(u32), proof_items...]
+            // For MVP/Expansion, we send empty proof (length 0)
+            const data = new Uint8Array(1 + 4);
+            const view = new DataView(data.buffer);
+            view.setUint8(0, 3); // Variant 3
+            view.setUint32(1, 0, true); // Proof len = 0
 
-            // For now, just try sending empty proof for testing if it's simpler
-            // Or implement full Merkle proof generation on frontend (needs tree state)
+            const [managerPda] = findGameManagerPda();
+            // We need treePda. We can get it from treeState logic or re-derive
+            if (!gameManager) throw new Error("Game Manager not loaded");
+            const [treePda] = findTreePda(gameManager.currentEpoch);
 
-            // Let's punt on Bloom for this first pass or just alert
-            alert("Bloom requires Merkle Proof generation which is not yet implemented in frontend.");
+            // Derive children PDAs
+            const [leftPda] = findChildBudPda(selectedBudAddress, 'left');
+            const [rightPda] = findChildBudPda(selectedBudAddress, 'right');
+
+            const tx = new Transaction().add({
+                keys: [
+                    { pubkey: publicKey, isSigner: true, isWritable: true },
+                    { pubkey: managerPda, isSigner: false, isWritable: true },
+                    { pubkey: treePda, isSigner: false, isWritable: true }, // Read-only in Rust? No, mutable (lines 252, 262 borrow data?) actually tree_state is read to verify proof. But children creation doesn't mod tree. Wait, lib.rs line 251: next_account_info. 
+                    // Rust: let tree_state_info = ...; let tree_state = TreeState::try_from_slice...
+                    // It is NOT written to. So isWritable: false is fine? 
+                    // Pinocchio `create_account` uses `invoke_signed`.
+                    // Actually, let's look at `lib.rs`: "tree_state_info" is passed. 
+                    // It is NOT mutable in the instruction processing for BloomBud (only read for root).
+                    // So writable: false is correct.
+                    { pubkey: selectedBudAddress, isSigner: false, isWritable: true },
+                    { pubkey: leftPda, isSigner: false, isWritable: true },
+                    { pubkey: rightPda, isSigner: false, isWritable: true },
+                    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+                ],
+                programId: PROGRAM_ID,
+                data: data,
+            });
+
+            const sig = await sendTransaction(tx, connection);
+            await connection.confirmTransaction(sig, 'confirmed');
+
+            alert("Bloomed! Children created.");
+            fetchBud(selectedBudAddress); // Refresh parent
+            fetchBud(leftPda); // Fetch new children
+            fetchBud(rightPda);
 
         } catch (e) {
             console.error("Bloom failed", e);
+            alert("Bloom failed: " + (e as any).message);
         } finally {
             setIsProcessing(false);
         }
     }
 
     return (
-        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Header / Controls */}
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Header / Stats */}
             <div style={{
                 padding: '1rem',
                 backgroundColor: theme.colors.surface,
                 borderRadius: '8px',
                 display: 'flex',
-                gap: '1rem',
-                alignItems: 'center'
+                gap: '2rem',
+                alignItems: 'center',
+                justifyContent: 'space-between'
             }}>
-                <span style={{ color: theme.colors.text.primary, fontWeight: 'bold' }}>Game Authority:</span>
-                <input
-                    value={authorityInput}
-                    onChange={(e) => setAuthorityInput(e.target.value)}
-                    style={{
-                        background: theme.colors.background,
-                        border: `1px solid ${theme.colors.border}`,
-                        color: theme.colors.text.primary,
-                        padding: '0.5rem',
-                        borderRadius: '4px',
-                        flex: 1,
-                        fontFamily: 'monospace'
-                    }}
-                />
-                <button
-                    onClick={() => {
-                        try {
-                            setTreeAuthority(new PublicKey(authorityInput));
-                        } catch (e) {
-                            alert("Invalid Public Key");
-                        }
-                    }}
-                    style={{
-                        padding: '0.5rem 1rem',
-                        backgroundColor: theme.colors.primary.main,
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    Load Tree
-                </button>
+                <div style={{ display: 'flex', gap: '2rem' }}>
+                    <div>
+                        <span style={{ color: theme.colors.text.secondary, fontSize: '0.9rem' }}>Epoch</span>
+                        <div style={{ color: theme.colors.text.primary, fontSize: '1.2rem', fontWeight: 'bold' }}>
+                            {gameManager?.currentEpoch.toString() || '-'}
+                        </div>
+                    </div>
+                    <div>
+                        <span style={{ color: theme.colors.text.secondary, fontSize: '0.9rem' }}>Prize Pool</span>
+                        <div style={{ color: theme.colors.primary.main, fontSize: '1.2rem', fontWeight: 'bold' }}>
+                            {gameManager ? (Number(gameManager.prizePool) / 1e9).toFixed(4) : '-'} SOL
+                        </div>
+                    </div>
+                </div>
+
+                {!publicKey && (
+                    <div style={{ color: theme.colors.text.secondary }}>
+                        Connect wallet to play
+                    </div>
+                )}
             </div>
 
             {/* Visualization */}

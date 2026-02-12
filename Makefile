@@ -1,4 +1,4 @@
-.PHONY: help test test-program test-frontend build build-program build-frontend deploy dev clean lint lint-program lint-frontend coverage coverage-program
+.PHONY: help test test-program test-frontend build build-program build-frontend deploy dev clean lint lint-program lint-frontend coverage coverage-program init-banyan
 
 # Default target
 help:
@@ -108,3 +108,8 @@ coverage-program:
 	@cargo llvm-cov --version > /dev/null 2>&1 || cargo install cargo-llvm-cov
 	@cd programs/rps && cargo llvm-cov --html
 	@echo "📊 Coverage report: programs/rps/target/llvm-cov/html/index.html"
+
+init-banyan:
+	@echo "🌱 Initializing Banyan..."
+	@cd frontend && yarn install && yarn init-banyan
+	

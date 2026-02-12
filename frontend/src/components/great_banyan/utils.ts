@@ -1,11 +1,23 @@
 import { PublicKey } from '@solana/web3.js';
 
-// TODO: Replace with actual program ID once deployed/configured
-export const PROGRAM_ID = new PublicKey('11111111111111111111111111111111'); // Placeholder
+import programIds from '../../../../program-ids.json';
+export const PROGRAM_ID = new PublicKey(programIds.localnet);
 
-export const findTreePda = (authority: PublicKey): [PublicKey, number] => {
+export const findGameManagerPda = (): [PublicKey, number] => {
     return PublicKey.findProgramAddressSync(
-        [Buffer.from('tree'), authority.toBuffer()],
+        [new TextEncoder().encode('manager')],
+        PROGRAM_ID
+    );
+};
+
+export const findTreePda = (epoch: bigint): [PublicKey, number] => {
+    // epoch is u64, need 8 bytes le
+    const epochBuffer = new Uint8Array(8);
+    const view = new DataView(epochBuffer.buffer);
+    view.setBigUint64(0, epoch, true);
+
+    return PublicKey.findProgramAddressSync(
+        [new TextEncoder().encode('tree'), epochBuffer],
         PROGRAM_ID
     );
 };
@@ -18,7 +30,7 @@ export const findBudPda = (treePda: PublicKey, path: 'root' | 'left' | 'right' |
 
     if (path === 'root') {
         return PublicKey.findProgramAddressSync(
-            [Buffer.from('bud'), treePda.toBuffer(), Buffer.from('root')],
+            [new TextEncoder().encode('bud'), treePda.toBuffer(), new TextEncoder().encode('root')],
             PROGRAM_ID
         );
     }
@@ -33,7 +45,7 @@ export const findBudPda = (treePda: PublicKey, path: 'root' | 'left' | 'right' |
 
 export const findChildBudPda = (parentBud: PublicKey, direction: 'left' | 'right'): [PublicKey, number] => {
     return PublicKey.findProgramAddressSync(
-        [Buffer.from('bud'), parentBud.toBuffer(), Buffer.from(direction)],
+        [new TextEncoder().encode('bud'), parentBud.toBuffer(), new TextEncoder().encode(direction)],
         PROGRAM_ID
     );
 }
@@ -54,4 +66,9 @@ export interface TreeAccount {
     totalPot: number; // u64
     authority: PublicKey;
     vitalityRequiredBase: number;
+}
+
+export interface GameManagerAccount {
+    currentEpoch: bigint;
+    prizePool: bigint;
 }

@@ -44,11 +44,6 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         const computedNodes: NodePosition[] = [];
         const computedLinks: Link[] = [];
 
-        // We traverse purely based on geometric derivation of children addresses
-        // We assume the root is at (0, 0) (bottom center)
-        // Y decreases (moves up visually) or increases? 
-        // Let's say Y=0 is bottom. Y increases upwards.
-
         // Dimensions
         const levelHeight = 100;
 
@@ -100,7 +95,8 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     return (
         <div style={{
             width: '100%',
-            height: '600px',
+            flex: 1,
+            minHeight: 0,
             backgroundColor: '#1a1a1a',
             borderRadius: '12px',
             overflow: 'hidden',
@@ -123,7 +119,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                         justifyContent: 'center'
                     }}>
                         {/* We offset our calculated system to center of this large canvas */}
-                        <div style={{ position: 'absolute', bottom: '100px', left: '50%' }}>
+                        <div style={{ position: 'absolute', bottom: '50%', left: '50%' }}>
 
                             {/* Links */}
                             <svg style={{ position: 'absolute', bottom: 0, left: -1000, width: 2000, height: 2000, overflow: 'visible', pointerEvents: 'none' }}>

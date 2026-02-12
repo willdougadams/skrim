@@ -208,7 +208,7 @@ export class GameAccountDeserializer {
    */
   static deserialize(data: Uint8Array): any {
     if (data.length < 100) {
-      throw new Error('Account data too small for GameAccount');
+      return null;
     }
 
     const view = new DataView(data.buffer, data.byteOffset);
