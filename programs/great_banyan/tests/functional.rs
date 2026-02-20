@@ -70,13 +70,11 @@ async fn test_initialize_tree() {
     let (root_bud_pda, _) = Pubkey::find_program_address(&[b"bud", tree_pda.as_ref(), b"root"], &program_id);
 
     // Instruction Data
-    let root_hash = [1u8; 32]; // Dummy root
-    let max_depth = 5;
+    let fruit_frequency = 256; 
     let vitality_required = 100;
 
     let init_ix = BanyanInstruction::InitializeTree {
-        root: root_hash,
-        max_depth,
+        fruit_frequency,
         vitality_required_base: vitality_required,
     };
 
@@ -105,7 +103,7 @@ async fn test_initialize_tree() {
     // Use deserialize to be safe against padding or extra bytes
     let mut tree_data_slice = &tree_account.data[..];
     let tree_state = TreeState::deserialize(&mut tree_data_slice).unwrap();
-    assert_eq!(tree_state.root, root_hash);
+    assert_eq!(tree_state.fruit_frequency, fruit_frequency);
     assert_eq!(tree_state.authority, payer.pubkey().to_bytes());
 
     let bud_account = banks_client.get_account(root_bud_pda).await.unwrap().unwrap();
@@ -148,8 +146,7 @@ async fn test_nurture_bud() {
     let (root_bud_pda, _) = Pubkey::find_program_address(&[b"bud", tree_pda.as_ref(), b"root"], &program_id);
 
     let init_ix = BanyanInstruction::InitializeTree {
-        root: [0u8; 32],
-        max_depth: 5,
+        fruit_frequency: 256,
         vitality_required_base: 100,
     };
      let init_instruction = Instruction {
@@ -232,17 +229,9 @@ async fn test_bloom_bud_win() {
     let (tree_pda, _) = Pubkey::find_program_address(&[b"tree", &epoch_bytes], &program_id);
     let (root_bud_pda, _) = Pubkey::find_program_address(&[b"bud", tree_pda.as_ref(), b"root"], &program_id);
     
-    let leaf = keccak::hash(root_bud_pda.as_ref()).0;
-    let sibling = [2u8; 32]; // Arbitrary sibling
-    let root = if leaf <= sibling {
-        keccak::hash(&[leaf, sibling].concat()).0
-    } else {
-        keccak::hash(&[sibling, leaf].concat()).0
-    };
-    
+    // Use fruit_frequency = 1 to guarantee a win on first bloom
     let init_ix = BanyanInstruction::InitializeTree {
-        root,
-        max_depth: 5,
+        fruit_frequency: 1,
         vitality_required_base: 10, // Low req for testing
     };
     let init_instruction = Instruction {
@@ -261,8 +250,17 @@ async fn test_bloom_bud_win() {
     banks_client.process_transaction(tx).await.unwrap();
 
     // 3. Nurture until vitality met
+    // Dummy children PDAs (needed for instruction when optional accounts are passed)
+    let (left_child_pda, _) = Pubkey::find_program_address(&[b"bud", root_bud_pda.as_ref(), b"left"], &program_id);
+    let (right_child_pda, _) = Pubkey::find_program_address(&[b"bud", root_bud_pda.as_ref(), b"right"], &program_id);
+
     for i in 0..10 {
          let nurture_ix = BanyanInstruction::NurtureBud { essence: format!("AGTC-{}", i) };
+         
+         // We can always pass the extra accounts, or only pass them when we expect to bloom.
+         // Passing them always is safer/simpler for client logic mostly.
+         // But here let's pass them to verify it works.
+         
          let nurture_instruction = Instruction {
             program_id,
             accounts: vec![
@@ -270,6 +268,10 @@ async fn test_bloom_bud_win() {
                 AccountMeta::new(manager_pda, false),
                 AccountMeta::new(root_bud_pda, false),
                 AccountMeta::new_readonly(system_program::id(), false),
+                // Extra accounts for auto-bloom
+                AccountMeta::new_readonly(tree_pda, false),
+                AccountMeta::new(left_child_pda, false),
+                AccountMeta::new(right_child_pda, false),
             ],
             data: borsh::to_vec(&nurture_ix).unwrap(),
         };
@@ -279,48 +281,16 @@ async fn test_bloom_bud_win() {
     }
     
     // Check prize pool > 0 and Vitality
-    let manager_account = banks_client.get_account(manager_pda).await.unwrap().unwrap();
-    let manager_state = GameManager::try_from_slice(&manager_account.data).unwrap();
-    assert!(manager_state.prize_pool > 0);
+    // Wait, if it auto-bloomed on the last one, the prize pool should be EMPTY (0) because it was paid out!
+    // And bud should be bloomed.
 
     let bud_account = banks_client.get_account(root_bud_pda).await.unwrap().unwrap();
     let mut bud_data_slice = &bud_account.data[..];
     let bud_state = Bud::deserialize(&mut bud_data_slice).unwrap();
+    
     assert!(bud_state.vitality_current >= bud_state.vitality_required);
-
-
-    // 4. Bloom (Win)
-    let proof = vec![sibling]; 
-    let bloom_ix = BanyanInstruction::BloomBud { proof };
-    
-    // Dummy children PDAs (needed for instruction even if not created on win)
-    let (left_child_pda, _) = Pubkey::find_program_address(&[b"bud", root_bud_pda.as_ref(), b"left"], &program_id);
-    let (right_child_pda, _) = Pubkey::find_program_address(&[b"bud", root_bud_pda.as_ref(), b"right"], &program_id);
-
-    let bloom_instruction = Instruction {
-        program_id,
-        accounts: vec![
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new(manager_pda, false), // Manager for funds and epoch
-            AccountMeta::new_readonly(tree_pda, false),
-            AccountMeta::new(root_bud_pda, false),
-            AccountMeta::new(left_child_pda, false),
-            AccountMeta::new(right_child_pda, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-        ],
-        data: borsh::to_vec(&bloom_ix).unwrap(),
-    };
-    
-    let mut tx = Transaction::new_with_payer(&[bloom_instruction], Some(&payer.pubkey()));
-    tx.sign(&[&payer], recent_blockhash);
-    banks_client.process_transaction(tx).await.unwrap();
-    
-    // Verify
-    let bud_account = banks_client.get_account(root_bud_pda).await.unwrap().unwrap();
-    let mut bud_data_slice = &bud_account.data[..];
-    let bud_state = Bud::deserialize(&mut bud_data_slice).unwrap();
     assert!(bud_state.is_bloomed);
-    assert!(bud_state.is_fruit); // Should be fruit
+    assert!(bud_state.is_fruit); // Should be fruit because fruit_frequency = 1
     
     // Verify Manager Reset
     let manager_account = banks_client.get_account(manager_pda).await.unwrap().unwrap();

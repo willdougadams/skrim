@@ -1,0 +1,20 @@
+action "setup_banyan" "svm::setup_surfnet" {
+    description = "Initialize local network with Great Banyan program"
+
+    # Deploy the Great Banyan program
+    deploy_program {
+        program_id = "5GppgsjuyeXPVXfGwni7s7ppXUW4qJb3UhEwSixDM5pp"
+        binary_path = "./programs/great_banyan/target/deploy/great_banyan.so"
+        authority = "programs/great_banyan/target/deploy/great_banyan-keypair.json"
+    }
+
+    # Deploy the RPS (Rock Paper Scissors) program
+    deploy_program {
+        program_id = "3tPcsGuXqWL6n3dgWMUEqMmRhChghjindpHp9LbGbbU5"
+        binary_path = "./programs/rps/target/deploy/throwdown_token_program.so"
+        authority = "programs/rps/target/deploy/throwdown_token_program-keypair.json"
+    }
+
+    # Airdrop some SOL to the user's test wallet (if they have one configured in Solana CLI)
+    # The default 'solana address' can be used if we knew it, but for now we'll just focus on the program.
+}

@@ -37,7 +37,7 @@ echo "🔨 Building program..."
 ./build.sh
 
 # Get existing program ID
-EXISTING_ID=$(node scripts/program-id-manager.js get $NETWORK 2>/dev/null || echo "")
+EXISTING_ID=$(node scripts/program-id-manager.js get $NETWORK rps 2>/dev/null || echo "")
 
 # Skip upgrade logic for localnet (validator gets reset every time)
 if [ "$NETWORK" != "localnet" ] && [ -n "$EXISTING_ID" ] && [ "$EXISTING_ID" != "11111111111111111111111111111111" ] && [ "$FORCE_NEW" != "true" ]; then
@@ -117,7 +117,7 @@ fi
 
 # Save the new program ID
 echo "💾 Saving Program ID to configuration..."
-node scripts/program-id-manager.js set $NETWORK $PROGRAM_ID
+node scripts/program-id-manager.js set $NETWORK rps $PROGRAM_ID
 
 echo ""
 echo "✅ Program deployed successfully!"

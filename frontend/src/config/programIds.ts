@@ -1,5 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
-import programIds from '../../../program-ids.json';
+import programIds from '../../../scripts/program-ids.json';
 
 type Network = 'localnet' | 'devnet' | 'mainnet-beta';
 
@@ -22,12 +22,19 @@ export function getCurrentNetwork(): Network {
   return 'devnet';
 }
 
-export function getProgramId(network?: Network): PublicKey {
+export function getProgramId(program: 'banyan' | 'rps' = 'rps', network?: Network): PublicKey {
   const targetNetwork = network || getCurrentNetwork();
 
   // Map mainnet-beta to mainnet for the JSON lookup
   const jsonKey = targetNetwork === 'mainnet-beta' ? 'mainnet' : targetNetwork;
-  const programId = programIds[jsonKey as keyof typeof programIds];
+  const netData = programIds[jsonKey as keyof typeof programIds];
+
+  if (!netData) {
+    throw new Error(`No configuration found for network: ${targetNetwork}`);
+  }
+
+  // Handle nested structure or legacy string
+  const programId = typeof netData === 'string' ? netData : (netData as any)[program];
 
   if (!programId || programId === "11111111111111111111111111111111") {
     throw new Error(`No program ID configured for network: ${targetNetwork}`);

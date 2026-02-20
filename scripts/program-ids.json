@@ -1,0 +1,19 @@
+{
+  "localnet": {
+    "banyan": "5GppgsjuyeXPVXfGwni7s7ppXUW4qJb3UhEwSixDM5pp",
+    "rps": "3tPcsGuXqWL6n3dgWMUEqMmRhChghjindpHp9LbGbbU5"
+  },
+  "devnet": {
+    "banyan": "3tPcsGuXqWL6n3dgWMUEqMmRhChghjindpHp9LbGbbU5",
+    "rps": "3tPcsGuXqWL6n3dgWMUEqMmRhChghjindpHp9LbGbbU5"
+  },
+  "mainnet": {
+    "banyan": null,
+    "rps": null
+  },
+  "last_updated": {
+    "devnet": "2025-10-02T08:21:23.032Z",
+    "localnet": "2026-02-17T20:13:08.900Z",
+    "mainnet": null
+  }
+}

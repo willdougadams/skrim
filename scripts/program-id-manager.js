@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROGRAM_IDS_FILE = path.join(__dirname, '..', 'program-ids.json');
+const PROGRAM_IDS_FILE = path.join(__dirname, 'program-ids.json');
 
 function loadProgramIds() {
     if (!fs.existsSync(PROGRAM_IDS_FILE)) {
@@ -21,46 +21,54 @@ function saveProgramIds(programIds) {
     fs.writeFileSync(PROGRAM_IDS_FILE, JSON.stringify(programIds, null, 2));
 }
 
-function updateProgramId(network, programId) {
+function updateProgramId(network, program, programId) {
     const programIds = loadProgramIds();
-    programIds[network] = programId;
+    if (!programIds[network]) programIds[network] = {};
+    if (typeof programIds[network] === 'string') {
+        // Migration: if it was a string, move it to 'rps' by default or just overwrite
+        programIds[network] = { rps: programIds[network] };
+    }
+    programIds[network][program] = programId;
     programIds.last_updated = programIds.last_updated || {};
     programIds.last_updated[network] = new Date().toISOString();
     saveProgramIds(programIds);
-    console.log(`✅ Updated ${network} program ID: ${programId}`);
+    console.log(`✅ Updated ${network} ${program} ID: ${programId}`);
 }
 
-function getProgramId(network) {
+function getProgramId(network, program) {
     const programIds = loadProgramIds();
-    return programIds[network];
+    const netData = programIds[network];
+    if (!netData) return null;
+    if (typeof netData === 'string') return netData; // Legacy support
+    return netData[program];
 }
 
 // CLI usage
-const [,, command, network, programId] = process.argv;
+const [, , command, network, program, programId] = process.argv;
 
 switch (command) {
     case 'get':
-        if (!network) {
-            console.error('Usage: node program-id-manager.js get <network>');
+        if (!network || !program) {
+            console.error('Usage: node program-id-manager.js get <network> <program>');
             process.exit(1);
         }
-        const id = getProgramId(network);
+        const id = getProgramId(network, program);
         if (id) {
             console.log(id);
         } else {
-            console.error(`No program ID found for ${network}`);
+            console.error(`No program ID found for ${network} ${program}`);
             process.exit(1);
         }
         break;
-    
+
     case 'set':
-        if (!network || !programId) {
-            console.error('Usage: node program-id-manager.js set <network> <program-id>');
+        if (!network || !program || !programId) {
+            console.error('Usage: node program-id-manager.js set <network> <program> <program-id>');
             process.exit(1);
         }
-        updateProgramId(network, programId);
+        updateProgramId(network, program, programId);
         break;
-    
+
     case 'list':
         const programIds = loadProgramIds();
         console.log('📋 Current Program IDs:');
@@ -71,7 +79,7 @@ switch (command) {
             }
         });
         break;
-    
+
     default:
         console.log('Usage:');
         console.log('  node program-id-manager.js get <network>');

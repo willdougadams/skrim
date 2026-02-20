@@ -15,14 +15,16 @@ const WalletContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     const endpoint = useMemo(() => {
         // Return appropriate RPC endpoint based on selected network
+        let ep = clusterApiUrl(WalletAdapterNetwork.Devnet);
         if (network === 'localnet') {
-            return 'http://127.0.0.1:8899';
+            ep = 'http://127.0.0.1:8899';
         } else if (network === 'devnet') {
-            return clusterApiUrl(WalletAdapterNetwork.Devnet);
+            ep = clusterApiUrl(WalletAdapterNetwork.Devnet);
         } else if (network === 'mainnet-beta') {
-            return clusterApiUrl(WalletAdapterNetwork.Mainnet);
+            ep = clusterApiUrl(WalletAdapterNetwork.Mainnet);
         }
-        return clusterApiUrl(WalletAdapterNetwork.Devnet);
+        console.log(`[WalletProvider] Network: ${network}, Endpoint: ${ep}`);
+        return ep;
     }, [network]);
 
     const wallets = useMemo(

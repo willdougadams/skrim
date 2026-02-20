@@ -4,7 +4,7 @@ import * as path from 'path';
 
 // Load Program ID
 // Use the main program-ids.json which is more reliable
-const ID_FILE = path.join(__dirname, '../../program-ids.json');
+const ID_FILE = path.join(__dirname, '../../scripts/program-ids.json');
 
 async function main() {
     if (!fs.existsSync(ID_FILE)) {
@@ -13,7 +13,8 @@ async function main() {
     }
 
     const ids = JSON.parse(fs.readFileSync(ID_FILE, 'utf8'));
-    const programIdStr = ids.localnet;
+    const localnet = ids.localnet;
+    const programIdStr = typeof localnet === 'string' ? localnet : localnet.banyan;
     if (!programIdStr) {
         console.error("❌ No localnet account found in ID file.");
         process.exit(1);
@@ -124,23 +125,18 @@ async function main() {
 
     // Data Layout:
     // [0] = Variant (1)
-    // [1..33] = Root Hash (32 bytes)
-    // [33] = Max Depth (1 byte)
-    // [34..42] = Vitality Required Base (8 bytes)
+    // [1..9] = Fruit Frequency (u64)
+    // [9..17] = Vitality Required Base (u64)
 
-    const rootHash = Buffer.alloc(32);
-    rootBudPda.toBuffer().copy(rootHash); // Fix: Use the actual Root Bud PDA address
-    const maxDepth = 5;
+    const fruitFreq = 10n; // 1 in 10 chance
     const vitalityReq = 100n; // u64
 
-    const data = Buffer.alloc(1 + 32 + 1 + 8);
+    const data = Buffer.alloc(1 + 8 + 8);
     let offset = 0;
     data.writeUInt8(1, offset); // Variant 1
     offset += 1;
-    rootHash.copy(data, offset);
-    offset += 32;
-    data.writeUInt8(maxDepth, offset);
-    offset += 1;
+    data.writeBigUInt64LE(fruitFreq, offset);
+    offset += 8;
     data.writeBigUInt64LE(vitalityReq, offset);
 
     // Accounts for InitializeTree:

@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IdiotChessEngine } from '../components/idiot_chess/GameEngine';
 import Board from '../components/idiot_chess/Board';
-import GameInfo from '../components/idiot_chess/GameInfo';
+
 import { theme } from '../theme';
 
 const IdiotChessPage: React.FC = () => {
@@ -21,7 +21,7 @@ const IdiotChessPage: React.FC = () => {
     useEffect(() => {
         if (gameState.turn === 'black' && !gameState.winner) {
             const timer = setTimeout(() => {
-                const moved = engineRef.current.makeRandomMove();
+                const moved = engineRef.current.makeSmartMove(3);
                 if (moved) {
                     handleMove();
                 }
@@ -30,10 +30,7 @@ const IdiotChessPage: React.FC = () => {
         }
     }, [gameState.turn, gameState.winner]);
 
-    const handleReset = () => {
-        engineRef.current = new IdiotChessEngine();
-        setGameState(engineRef.current.getState());
-    };
+
 
     return (
         <div className="idiot-chess-page">
@@ -55,22 +52,12 @@ const IdiotChessPage: React.FC = () => {
                 </button>
                 <h1 style={{ margin: 0, color: theme.colors.text.primary }}>Idiot Chess</h1>
             </div>
-
-            <div className="idiot-chess-layout">
-                <div className="idiot-chess-board-wrapper">
-                    <Board
-                        engine={engineRef.current}
-                        state={gameState}
-                        onMove={handleMove}
-                    />
-                </div>
-                <div className="idiot-chess-info">
-                    <GameInfo
-                        turn={gameState.turn}
-                        winner={gameState.winner}
-                        onReset={handleReset}
-                    />
-                </div>
+            <div className="idiot-chess-board-container">
+                <Board
+                    engine={engineRef.current}
+                    state={gameState}
+                    onMove={handleMove}
+                />
             </div>
         </div>
     );

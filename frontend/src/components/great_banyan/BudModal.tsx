@@ -26,7 +26,7 @@ export const BudModal: React.FC<BudModalProps> = ({
 
     const [essence, setEssence] = React.useState('');
 
-    const progress = Math.min(100, (bud.vitalityCurrent / bud.vitalityRequired) * 100);
+    const progress = Number(bud.vitalityRequired > 0n ? (bud.vitalityCurrent * 100n) / bud.vitalityRequired : 0n);
     const isReadyToBloom = bud.vitalityCurrent >= bud.vitalityRequired;
 
     return (
@@ -68,7 +68,7 @@ export const BudModal: React.FC<BudModalProps> = ({
                 <div style={{ marginBottom: '1.5rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                         <span style={{ fontSize: '0.875rem', color: theme.colors.text.secondary }}>VITALITY</span>
-                        <span>{bud.vitalityCurrent} / {bud.vitalityRequired}</span>
+                        <span>{bud.vitalityCurrent.toString()} / {bud.vitalityRequired.toString()}</span>
                     </div>
                     <div style={{ height: '8px', backgroundColor: theme.colors.background, borderRadius: '4px', overflow: 'hidden' }}>
                         <div style={{
@@ -77,6 +77,23 @@ export const BudModal: React.FC<BudModalProps> = ({
                             backgroundColor: isReadyToBloom ? theme.colors.secondary.main : theme.colors.primary.main,
                             transition: 'width 0.3s ease'
                         }} />
+                    </div>
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ fontSize: '0.875rem', color: theme.colors.text.secondary, marginBottom: '0.5rem' }}>CONTRIBUTIONS</div>
+                    <div style={{ fontSize: '0.875rem', backgroundColor: theme.colors.background, padding: '0.5rem', borderRadius: '4px' }}>
+                        {bud.contributions && bud.contributions.length > 0 ? (
+                            <ul style={{ margin: 0, paddingLeft: '1.2rem', listStyle: 'circle' }}>
+                                {bud.contributions.map(([pk, amount], idx) => (
+                                    <li key={idx}>
+                                        {pk.toString().slice(0, 4)}...{pk.toString().slice(-4)}: <strong>{amount.toString()}</strong>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <span style={{ opacity: 0.6 }}>No contributors yet</span>
+                        )}
                     </div>
                 </div>
 

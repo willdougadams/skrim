@@ -22,7 +22,9 @@ export class GameService {
     private programId: PublicKey;
 
     constructor(private connection: Connection) {
-        this.programId = getProgramId(); // Auto-detect network
+        this.programId = getProgramId('rps'); // Specifically use rps for lobby
+        console.log('[GameService] Initialized with Program ID:', this.programId.toString());
+        console.log('[GameService] Connection RPC Endpoint:', this.connection.rpcEndpoint);
     }
 
 
@@ -66,7 +68,7 @@ export class GameService {
                             current_players: gameData.players.length,
                             buy_in_lamports: BigInt(gameData.buy_in_lamports || 0),
                             stateValue: gameData.state === 'WaitingForPlayers' ? 0 :
-                                       gameData.state === 'InProgress' ? 1 : 2,
+                                gameData.state === 'InProgress' ? 1 : 2,
                             state: gameData.state || 'WaitingForPlayers',
                             created_at: Math.floor(Date.now() / 1000), // Approximate since we don't store creation time
                             current_round: gameData.current_round,

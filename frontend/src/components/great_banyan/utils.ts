@@ -1,7 +1,8 @@
 import { PublicKey } from '@solana/web3.js';
 
-import programIds from '../../../../program-ids.json';
-export const PROGRAM_ID = new PublicKey(programIds.localnet);
+import programIds from '../../../../scripts/program-ids.json';
+const netData = (programIds as any).localnet;
+export const PROGRAM_ID = new PublicKey(typeof netData === 'string' ? netData : netData.banyan);
 
 export const findGameManagerPda = (): [PublicKey, number] => {
     return PublicKey.findProgramAddressSync(
@@ -53,17 +54,15 @@ export const findChildBudPda = (parentBud: PublicKey, direction: 'left' | 'right
 export interface BudAccount {
     parent: PublicKey;
     depth: number;
-    vitalityCurrent: number;
-    vitalityRequired: number;
+    vitalityCurrent: bigint;
+    vitalityRequired: bigint;
     isBloomed: boolean;
     isFruit: boolean;
-    nurturers: PublicKey[];
+    contributions: [PublicKey, bigint][];
 }
 
 export interface TreeAccount {
-    root: number[]; // [u8; 32]
-    maxDepth: number;
-    totalPot: number; // u64
+    fruitFrequency: number; // u64
     authority: PublicKey;
     vitalityRequiredBase: number;
 }

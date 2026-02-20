@@ -5,7 +5,7 @@ import { keccak_256 } from 'js-sha3';
 
 // --- Configuration ---
 const RPC_URL = "http://127.0.0.1:8899";
-const ID_FILE = path.join(__dirname, '../../program-ids.json');
+const ID_FILE = path.join(__dirname, '../../scripts/program-ids.json');
 
 // --- Types ---
 interface GameManagerAccount {
@@ -14,20 +14,20 @@ interface GameManagerAccount {
 }
 
 interface TreeAccount {
-    root: number[];
-    maxDepth: number;
+    fruitFrequency: bigint;
     authority: PublicKey;
-    vitalityRequiredBase: number;
+    vitalityRequiredBase: bigint;
 }
 
 interface BudAccount {
     address: PublicKey;
     parent: PublicKey;
     depth: number;
-    vitalityCurrent: number;
-    vitalityRequired: number;
+    vitalityCurrent: bigint;
+    vitalityRequired: bigint;
     isBloomed: boolean;
     isFruit: boolean;
+    contributions: [PublicKey, bigint][];
 }
 
 // --- Main Bot Logic ---
@@ -56,7 +56,9 @@ async function main() {
         process.exit(1);
     }
     const ids = JSON.parse(fs.readFileSync(ID_FILE, 'utf8'));
-    const PROGRAM_ID = new PublicKey(ids.localnet);
+    const localnet = ids.localnet;
+    const programIdStr = typeof localnet === 'string' ? localnet : localnet.banyan;
+    const PROGRAM_ID = new PublicKey(programIdStr);
     console.log(`📜 Program ID: ${PROGRAM_ID.toString()}`);
 
     // --- Helpers ---
@@ -99,16 +101,16 @@ async function main() {
         const info = await connection.getAccountInfo(pda);
         if (!info) return null;
 
-        // Layout: root(32), max_depth(1), authority(32), base_vit(8)
+        // Layout: fruit_frequency(8), authority(32), base_vit(8)
+        // Previous: root(32), max_depth(1), authority(32), base_vit(8)
         let offset = 0;
-        const root = Array.from(info.data.subarray(offset, 32)); offset += 32;
-        const maxDepth = info.data[offset]; offset += 1;
+        const fruitFrequency = info.data.readBigUInt64LE(offset); offset += 8;
         const authority = new PublicKey(info.data.subarray(offset, offset + 32)); offset += 32;
-        const vitalityRequiredBase = Number(info.data.readBigUInt64LE(offset));
+        const vitalityRequiredBase = info.data.readBigUInt64LE(offset); offset += 8;
 
         return {
             address: pda,
-            account: { root, maxDepth, authority, vitalityRequiredBase }
+            account: { fruitFrequency, authority, vitalityRequiredBase }
         };
     }
 
@@ -119,12 +121,55 @@ async function main() {
         let offset = 0;
         const parent = new PublicKey(info.data.subarray(offset, 32)); offset += 32;
         const depth = info.data[offset]; offset += 1;
-        const vitalityCurrent = Number(info.data.readBigUInt64LE(offset)); offset += 8;
-        const vitalityRequired = Number(info.data.readBigUInt64LE(offset)); offset += 8;
+        const vitalityCurrent = info.data.readBigUInt64LE(offset); offset += 8;
+        const vitalityRequired = info.data.readBigUInt64LE(offset); offset += 8;
         const isBloomed = info.data[offset] !== 0; offset += 1;
         const isFruit = info.data[offset] !== 0; offset += 1;
 
-        return { address, parent, depth, vitalityCurrent, vitalityRequired, isBloomed, isFruit };
+        // Contributions: Vec<([u8; 32], u64)>
+        const contributionsLen = info.data.readUInt32LE(offset); offset += 4;
+        const contributions: [PublicKey, bigint][] = [];
+        for (let i = 0; i < contributionsLen; i++) {
+            const pk = new PublicKey(info.data.subarray(offset, offset + 32)); offset += 32;
+            const amount = info.data.readBigUInt64LE(offset); offset += 8;
+            contributions.push([pk, amount]);
+        }
+
+        return { address, parent, depth, vitalityCurrent, vitalityRequired, isBloomed, isFruit, contributions };
+    }
+
+    async function actionInitializeTree(epoch: bigint) {
+        console.log(`🌱 Initializing Tree for epoch ${epoch}...`);
+        const fruitFreq = 10n;
+        const vitalityReqBase = 100n;
+
+        const [treePda] = findTreePda(epoch);
+        const [rootBudPda] = findBudPda(treePda, 'root');
+        const [managerPda] = findGameManagerPda();
+
+        const data = Buffer.alloc(1 + 8 + 8);
+        data.writeUInt8(1, 0); // InitializeTree
+        data.writeBigUInt64LE(fruitFreq, 1);
+        data.writeBigUInt64LE(vitalityReqBase, 9);
+
+        const tx = new Transaction().add({
+            keys: [
+                { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+                { pubkey: managerPda, isSigner: false, isWritable: true },
+                { pubkey: treePda, isSigner: false, isWritable: true },
+                { pubkey: rootBudPda, isSigner: false, isWritable: true },
+                { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+            ],
+            programId: PROGRAM_ID,
+            data
+        });
+
+        try {
+            const sig = await sendAndConfirmTransaction(connection, tx, [payer]);
+            console.log(`✅ Tree Initialized! Sig: ${sig}`);
+        } catch (e: any) {
+            console.error(`❌ Initialization failed: ${e.message}`);
+        }
     }
 
     // Traverse tree to find actionable buds
@@ -155,7 +200,8 @@ async function main() {
     }
 
     // Action: Nurture (Mine + Send)
-    async function actionNurture(bud: BudAccount) {
+    // Now handles auto-bloom if vitality requirement is met
+    async function actionNurture(bud: BudAccount, epoch: bigint) {
         console.log(`⛏️  Mining for bud ${bud.address.toString().slice(0, 8)}... (Vit: ${bud.vitalityCurrent}/${bud.vitalityRequired})`);
 
         const essence = "water";
@@ -163,11 +209,7 @@ async function main() {
 
         // Mining Loop
         let bestNonce = 0n;
-        let bestGain = 0; // We need at least 1, but typically want more. 
-
-        // Target: just find *any* valid nonce that gives > 0 gain. 
-        // For speed, we accept the first specialized gain (e.g. > 1) or just loop for 100ms.
-        // Actually, let's just loop 1000 times.
+        let bestGain = 0;
 
         const encoder = new TextEncoder();
         const essenceBytes = encoder.encode(essence);
@@ -188,12 +230,12 @@ async function main() {
         for (let i = 0n; i < 5000n; i++) {
             buffer.writeBigUInt64LE(i, nonceOffset);
             const hash = keccak_256.array(buffer);
-            const gain = (hash[0] % 3) + (hash[1] % 3) + 1;
+            const gain = (hash[0] % 3) + 3;
 
             if (gain > bestGain) {
                 bestGain = gain;
                 bestNonce = i;
-                if (gain >= 3) break; // Good enough for a bot
+                if (gain >= 5) break;
             }
         }
 
@@ -210,12 +252,21 @@ async function main() {
 
         const [managerPda] = findGameManagerPda();
 
+        // Prepare extra accounts for auto-bloom
+        const [treePda] = findTreePda(epoch);
+        const [leftPda] = findChildBudPda(bud.address, 'left');
+        const [rightPda] = findChildBudPda(bud.address, 'right');
+
         const tx = new Transaction().add({
             keys: [
                 { pubkey: payer.publicKey, isSigner: true, isWritable: true },
                 { pubkey: managerPda, isSigner: false, isWritable: true },
                 { pubkey: bud.address, isSigner: false, isWritable: true },
-                { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
+                { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+                // Extra accounts for auto-bloom (always passed)
+                { pubkey: treePda, isSigner: false, isWritable: false },
+                { pubkey: leftPda, isSigner: false, isWritable: true },
+                { pubkey: rightPda, isSigner: false, isWritable: true },
             ],
             programId: PROGRAM_ID,
             data
@@ -226,44 +277,6 @@ async function main() {
             console.log(`✅ Nurtured! Sig: ${sig}`);
         } catch (e: any) {
             console.error(`❌ Nurture failed: ${e.message}`);
-        }
-    }
-
-    // Action: Bloom
-    async function actionBloom(bud: BudAccount, epoch: bigint) {
-        console.log(`🌸 Blooming bud ${bud.address.toString().slice(0, 8)}...`);
-
-        const [managerPda] = findGameManagerPda();
-        const [treePda] = findTreePda(epoch);
-        const [leftPda] = findChildBudPda(bud.address, 'left');
-        const [rightPda] = findChildBudPda(bud.address, 'right');
-
-        // [3, proof_len(4), ...noproof]
-        const data = Buffer.alloc(5);
-        data.writeUInt8(3, 0);
-        data.writeUInt32LE(0, 1);
-
-        const tx = new Transaction().add({
-            keys: [
-                { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-                { pubkey: managerPda, isSigner: false, isWritable: true },
-                { pubkey: treePda, isSigner: false, isWritable: false }, // Read only? In Rust it is read-only for verification.
-                // Wait, in Game.tsx I saw a comment about it.
-                // Re-checking Game.tsx: "isWritable: false" was determined correct.
-                { pubkey: bud.address, isSigner: false, isWritable: true },
-                { pubkey: leftPda, isSigner: false, isWritable: true },
-                { pubkey: rightPda, isSigner: false, isWritable: true },
-                { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
-            ],
-            programId: PROGRAM_ID,
-            data
-        });
-
-        try {
-            const sig = await sendAndConfirmTransaction(connection, tx, [payer], { skipPreflight: true });
-            console.log(`✅ Bloomed! Sig: ${sig}`);
-        } catch (e: any) {
-            console.error(`❌ Bloom failed: ${e.message}`);
         }
     }
 
@@ -280,7 +293,8 @@ async function main() {
 
             const tree = await fetchTree(manager.currentEpoch);
             if (!tree) {
-                console.log("Waiting for tree...");
+                console.log(`🌱 Tree for epoch ${manager.currentEpoch} not found. Initializing...`);
+                await actionInitializeTree(manager.currentEpoch);
                 await new Promise(r => setTimeout(r, 2000));
                 continue;
             }
@@ -299,11 +313,8 @@ async function main() {
             // Pick random bud
             const target = actionable[Math.floor(Math.random() * actionable.length)];
 
-            if (target.vitalityCurrent >= target.vitalityRequired) {
-                await actionBloom(target, manager.currentEpoch);
-            } else {
-                await actionNurture(target);
-            }
+            // Always nurture (handles bloom internally now)
+            await actionNurture(target, manager.currentEpoch);
 
             // Small delay between actions
             await new Promise(r => setTimeout(r, 1000));

@@ -66,38 +66,24 @@ export const GreatBanyanGame: React.FC = () => {
             }
 
             // Layout: 
-            // root: 32
-            // max_depth: 1
-            // total_pot: 8 (Removed in refactor? No, TreeState struct might still have it or removed? 
-            // Checked lib.rs: TreeState struct has: root, max_depth, authority, vitality_required_base. 
-            // total_pot MOVED to GameManager.
-            // Let's re-check lib.rs struct definition to be safe.
-            // src/lib.rs:
-            // pub struct TreeState {
-            //     pub root: [u8; 32],
-            //     pub max_depth: u8,
-            //     pub authority: [u8; 32],
-            //     pub vitality_required_base: u64,
-            // }
-            // So total_pot is GONE.
+            // fruit_frequency: u64 (8 bytes)
+            // authority: [u8; 32] (32 bytes)
+            // vitality_required_base: u64 (8 bytes)
 
             const data = accountInfo.data;
+            const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
             let offset = 0;
-            const root = Array.from(data.subarray(offset, offset + 32));
-            offset += 32;
-            const maxDepth = data[offset];
-            offset += 1;
+            const fruitFrequency = Number(view.getBigUint64(offset, true));
+            offset += 8;
+
             const authority = new PublicKey(data.subarray(offset, offset + 32));
             offset += 32;
 
-            const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-            // offset is 32 + 1 + 32 = 65
             const vitalityRequiredBase = Number(view.getBigUint64(offset, true));
 
             setTreeState({
-                root,
-                maxDepth,
-                totalPot: 0, // Field deprecated/moved
+                fruitFrequency,
                 authority,
                 vitalityRequiredBase
             });
@@ -137,15 +123,27 @@ export const GreatBanyanGame: React.FC = () => {
             offset += 1;
 
             const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-            // Use BigUint64 for deserialization
-            const vitalityCurrent = Number(view.getBigUint64(offset, true));
+            const vitalityCurrent = view.getBigUint64(offset, true);
             offset += 8;
-            const vitalityRequired = Number(view.getBigUint64(offset, true));
+            const vitalityRequired = view.getBigUint64(offset, true);
             offset += 8;
             const isBloomed = data[offset] !== 0;
             offset += 1;
             const isFruit = data[offset] !== 0;
             offset += 1;
+
+            // Deserialize contributions: Vec<([u8; 32], u64)>
+            // Borsh Vec starts with u32 length
+            const contributionsLen = view.getUint32(offset, true);
+            offset += 4;
+            const contributions: [PublicKey, bigint][] = [];
+            for (let i = 0; i < contributionsLen; i++) {
+                const pk = new PublicKey(data.subarray(offset, offset + 32));
+                offset += 32;
+                const amount = view.getBigUint64(offset, true);
+                offset += 8;
+                contributions.push([pk, amount]);
+            }
 
             const budAcc: BudAccount = {
                 parent,
@@ -154,7 +152,7 @@ export const GreatBanyanGame: React.FC = () => {
                 vitalityRequired,
                 isBloomed,
                 isFruit,
-                nurturers: []
+                contributions
             };
 
             setBuds(prev => new Map(prev).set(address.toString(), budAcc));
@@ -239,9 +237,10 @@ export const GreatBanyanGame: React.FC = () => {
                 miningView.setBigUint64(nonceOffset, nonce, true); // LE
 
                 // Hash
-                const hashParams = keccak_256.array(miningBuffer); // Returns number[]
-                // Calculate Gain: (h[0]%3) + (h[1]%3) + 1
-                const g = (hashParams[0] % 3) + (hashParams[1] % 3) + 1;
+                // @ts-ignore - Typing mismatch but works at runtime
+                const hashParams = keccak_256.array(miningBuffer);
+                // Calculate Gain: (h[0]%3) + 3
+                const g = (hashParams[0] % 3) + 3;
 
                 if (g > bestGain) {
                     bestGain = g;
@@ -265,8 +264,12 @@ export const GreatBanyanGame: React.FC = () => {
             view.setUint32(17, essenceBytes.length, true); // Essence Len
             data.set(essenceBytes, 21);
 
-            // Accounts: [payer, manager, bud, system_program]
+            // Accounts: [payer, manager, bud, system_program, tree, left, right]
             const [managerPda] = findGameManagerPda();
+            if (!gameManager) throw new Error("Game Manager not loaded");
+            const [treePda] = findTreePda(gameManager.currentEpoch);
+            const [leftPda] = findChildBudPda(selectedBudAddress, 'left');
+            const [rightPda] = findChildBudPda(selectedBudAddress, 'right');
 
             const tx = new Transaction().add({
                 keys: [
@@ -274,22 +277,37 @@ export const GreatBanyanGame: React.FC = () => {
                     { pubkey: managerPda, isSigner: false, isWritable: true },
                     { pubkey: selectedBudAddress, isSigner: false, isWritable: true },
                     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+                    // Extra accounts for auto-bloom
+                    { pubkey: treePda, isSigner: false, isWritable: false },
+                    { pubkey: leftPda, isSigner: false, isWritable: true },
+                    { pubkey: rightPda, isSigner: false, isWritable: true },
                 ],
                 programId: PROGRAM_ID,
-                data: data,
+                data: Buffer.from(data),
             });
 
             const sig = await sendTransaction(tx, connection);
+            console.log(`Nurture sent: ${sig}`);
 
-            // Optimistic update
             await connection.confirmTransaction(sig, 'confirmed');
 
             // Re-fetch everything
             fetchGameManager();
-            fetchBud(selectedBudAddress);
+            await fetchBud(selectedBudAddress);
+
+            // If it bloomed, fetch the new children too
+            const updatedBud = buds.get(selectedBudAddress.toString());
+            if (updatedBud?.isBloomed) {
+                console.log("Bud bloomed! Fetching children...");
+                fetchBud(leftPda);
+                fetchBud(rightPda);
+            }
 
         } catch (e) {
             console.error("Nurture failed", e);
+            if ((e as any).logs) {
+                console.log("Transaction Logs:", (e as any).logs);
+            }
             alert("Nurture failed: " + (e as any).message);
         } finally {
             setIsProcessing(false);
@@ -301,12 +319,10 @@ export const GreatBanyanGame: React.FC = () => {
         setIsProcessing(true);
         try {
             // BloomBud: Variant 3
-            // Data: [3, proof_len(u32), proof_items...]
-            // For MVP/Expansion, we send empty proof (length 0)
-            const data = new Uint8Array(1 + 4);
+            // Data: [3] (No proof needed anymore)
+            const data = new Uint8Array(1);
             const view = new DataView(data.buffer);
             view.setUint8(0, 3); // Variant 3
-            view.setUint32(1, 0, true); // Proof len = 0
 
             const [managerPda] = findGameManagerPda();
             // We need treePda. We can get it from treeState logic or re-derive
@@ -342,7 +358,7 @@ export const GreatBanyanGame: React.FC = () => {
                     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
                 ],
                 programId: PROGRAM_ID,
-                data: data,
+                data: Buffer.from(data),
             });
 
             const sig = await sendTransaction(tx, connection);
@@ -359,7 +375,50 @@ export const GreatBanyanGame: React.FC = () => {
         } finally {
             setIsProcessing(false);
         }
-    }
+    };
+
+    const handleInitializeTree = async () => {
+        if (!gameManager || !publicKey) return;
+        setIsProcessing(true);
+        try {
+            // InitializeTree: Variant 1
+            const fruitFreq = 10n;
+            const vitalityReq = 100n;
+
+            const data = new Uint8Array(1 + 8 + 8);
+            const view = new DataView(data.buffer);
+            view.setUint8(0, 1);
+            view.setBigUint64(1, fruitFreq, true);
+            view.setBigUint64(9, vitalityReq, true);
+
+            const [treePda] = findTreePda(gameManager.currentEpoch);
+            const [rootBudPda] = findBudPda(treePda, 'root');
+            const [managerPda] = findGameManagerPda();
+
+            const tx = new Transaction().add({
+                keys: [
+                    { pubkey: publicKey, isSigner: true, isWritable: true },
+                    { pubkey: managerPda, isSigner: false, isWritable: true },
+                    { pubkey: treePda, isSigner: false, isWritable: true },
+                    { pubkey: rootBudPda, isSigner: false, isWritable: true },
+                    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+                ],
+                programId: PROGRAM_ID,
+                data: Buffer.from(data),
+            });
+
+            const sig = await sendTransaction(tx, connection);
+            await connection.confirmTransaction(sig, 'confirmed');
+
+            alert("Tree Initialized for Epoch " + gameManager.currentEpoch.toString());
+            fetchTree();
+        } catch (e) {
+            console.error("Initialization failed", e);
+            alert("Initialization failed: " + (e as any).message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -392,6 +451,24 @@ export const GreatBanyanGame: React.FC = () => {
                     <div style={{ color: theme.colors.text.secondary }}>
                         Connect wallet to play
                     </div>
+                )}
+
+                {publicKey && !treeState && (
+                    <button
+                        onClick={handleInitializeTree}
+                        disabled={isProcessing}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            backgroundColor: theme.colors.primary.main,
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        {isProcessing ? 'Initializing...' : 'Initialize Tree for Epoch ' + (gameManager?.currentEpoch.toString() || '0')}
+                    </button>
                 )}
             </div>
 

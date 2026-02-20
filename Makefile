@@ -1,4 +1,4 @@
-.PHONY: help test test-program test-frontend build build-program build-frontend deploy dev clean lint lint-program lint-frontend coverage coverage-program init-banyan
+.PHONY: help test test-program test-frontend build build-program build-frontend deploy dev clean lint lint-program lint-frontend coverage coverage-program init-banyan banyan-bot
 
 # Default target
 help:
@@ -63,6 +63,21 @@ deploy:
 	@echo "🚀 Deploying program..."
 	@./deploy.sh
 
+# Run Great Banyan tests
+test-banyan:
+	@echo "🦀 Running Great Banyan tests..."
+	@cd programs/great_banyan && cargo test
+
+# Build Great Banyan
+build-banyan:
+	@echo "🦀 Building Great Banyan..."
+	@bash scripts/build-banyan.sh
+
+# Deploy Great Banyan
+deploy-banyan:
+	@echo "🚀 Deploying Great Banyan..."
+	@bash scripts/deploy-banyan.sh
+
 # Start frontend dev server
 dev:
 	@echo "🔥 Starting frontend dev server..."
@@ -113,7 +128,7 @@ init-banyan:
 	@echo "🌱 Initializing Banyan..."
 	@cd frontend && yarn install && yarn init-banyan
 
-bot:
+banyan-bot:
 	@echo "🤖 Starting Banyan Bot..."
 	@cd frontend && npx tsx scripts/banyan-bot.ts
 	
