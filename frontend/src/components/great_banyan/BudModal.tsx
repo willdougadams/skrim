@@ -54,20 +54,14 @@ export const BudModal: React.FC<BudModalProps> = ({
                 boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.5rem' }}>Bud Details</h2>
+                    <h2 style={{ margin: 0, fontSize: '1.5rem', color: theme.colors.primary.main }}>Nurture this Bud</h2>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', color: theme.colors.text.secondary, cursor: 'pointer', fontSize: '1.5rem' }}>×</button>
                 </div>
 
-                <div style={{ marginBottom: '1.5rem' }}>
-                    <div style={{ fontSize: '0.875rem', color: theme.colors.text.secondary, marginBottom: '0.5rem' }}>ADDRESS</div>
-                    <div style={{ fontFamily: 'monospace', backgroundColor: theme.colors.background, padding: '0.5rem', borderRadius: '4px', wordBreak: 'break-all' }}>
-                        {budAddress?.toString()}
-                    </div>
-                </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.875rem', color: theme.colors.text.secondary }}>VITALITY</span>
+                        <span style={{ fontSize: '0.875rem', color: theme.colors.text.secondary }}>GROWTH PROGRESS</span>
                         <span>{bud.vitalityCurrent.toString()} / {bud.vitalityRequired.toString()}</span>
                     </div>
                     <div style={{ height: '8px', backgroundColor: theme.colors.background, borderRadius: '4px', overflow: 'hidden' }}>
@@ -81,8 +75,8 @@ export const BudModal: React.FC<BudModalProps> = ({
                 </div>
 
                 <div style={{ marginBottom: '1.5rem' }}>
-                    <div style={{ fontSize: '0.875rem', color: theme.colors.text.secondary, marginBottom: '0.5rem' }}>CONTRIBUTIONS</div>
-                    <div style={{ fontSize: '0.875rem', backgroundColor: theme.colors.background, padding: '0.5rem', borderRadius: '4px' }}>
+                    <div style={{ fontSize: '0.875rem', color: theme.colors.text.secondary, marginBottom: '0.5rem' }}>RECENT NURTURERS</div>
+                    <div style={{ fontSize: '0.875rem', backgroundColor: theme.colors.background, padding: '0.5rem', borderRadius: '8px' }}>
                         {bud.contributions && bud.contributions.length > 0 ? (
                             <ul style={{ margin: 0, paddingLeft: '1.2rem', listStyle: 'circle' }}>
                                 {bud.contributions.map(([pk, amount], idx) => (
@@ -129,13 +123,13 @@ export const BudModal: React.FC<BudModalProps> = ({
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                                 <input
                                     type="text"
-                                    placeholder="Enter essence (message)..."
+                                    placeholder="Whisper kind words..."
                                     value={essence}
                                     onChange={(e) => setEssence(e.target.value)}
                                     style={{
                                         flex: 1,
                                         padding: '0.75rem',
-                                        borderRadius: '6px',
+                                        borderRadius: '8px',
                                         border: `1px solid ${theme.colors.border}`,
                                         backgroundColor: theme.colors.background,
                                         color: theme.colors.text.primary
@@ -149,7 +143,7 @@ export const BudModal: React.FC<BudModalProps> = ({
                                         backgroundColor: theme.colors.primary.main,
                                         color: 'white',
                                         border: 'none',
-                                        borderRadius: '6px',
+                                        borderRadius: '8px',
                                         fontWeight: 'bold',
                                         cursor: (!essence || isProcessing) ? 'not-allowed' : 'pointer',
                                         opacity: (!essence || isProcessing) ? 0.6 : 1

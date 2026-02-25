@@ -77,7 +77,8 @@ export function MatchupDisplay({
         const player = rawGameData.players.find((p: any) =>
             (p.pubkey || p.toString()) === playerPubkey
         );
-        return player && player.moves_revealed && player.moves_revealed[0] !== null;
+        // Correct check: moves_revealed is [u8; 5], non-zero means revealed
+        return !!(player && player.moves_revealed && player.moves_revealed.some((m: any) => m !== 0));
     };
 
     const findPlayerBySlot = (slot: number): Player | undefined => {

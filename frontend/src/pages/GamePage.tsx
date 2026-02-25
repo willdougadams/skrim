@@ -161,8 +161,7 @@ export default function GamePage() {
   useEffect(() => {
     if (!publicKey || !gameId || !gameData) return;
 
-    const currentRound = gameData.currentRound;
-    const storedMoves = loadMovesFromLocalStorage(publicKey.toString(), gameId, currentRound);
+    const storedMoves = loadMovesFromLocalStorage(publicKey.toString(), gameId, 0);
 
     if (storedMoves) {
       console.log('Loaded moves from localStorage:', storedMoves);
@@ -208,7 +207,7 @@ export default function GamePage() {
     );
     // moves_revealed is now [move_index]
     return userPlayer && userPlayer.moves_revealed &&
-      userPlayer.moves_revealed[0] !== null;
+      userPlayer.moves_revealed.some((m: any) => m !== 0);
   };
 
   const hasOpponentSubmittedMoves = () => {
@@ -238,64 +237,7 @@ export default function GamePage() {
   };
 
   // Action handlers
-  const handleSubmitMoves = async () => {
-    if (!publicKey || !gameId || selectedMoves.length !== 5) {
-      showToast('Please select 5 moves first', 'error');
-      return;
-    }
-
-    const toastId = showToast('Submitting moves...', 'loading');
-    try {
-      const programClient = createWeb3ProgramClient(connection, wallet);
-
-      // Generate cryptographically secure 64-bit salt
-      const saltArray = new Uint8Array(8);
-      crypto.getRandomValues(saltArray);
-      const salt = new DataView(saltArray.buffer).getBigUint64(0, true);
-      setMoveSalt(salt);
-
-      // Convert moves to numbers (Rock=0, Paper=1, Scissors=2)
-      const moveNumbers = selectedMoves.map(move => {
-        switch (move) {
-          case 'rock': return 0;
-          case 'paper': return 1;
-          case 'scissors': return 2;
-          default: return 0;
-        }
-      });
-
-      // Save moves to localStorage BEFORE submitting transaction
-      saveMovesToLocalStorage(
-        publicKey.toString(),
-        gameId,
-        0, // Round always 0
-        selectedMoves,
-        salt
-      );
-
-      await programClient.submitMoves(gameId, moveNumbers, salt);
-      updateToast(toastId, 'Moves submitted! Keep them private until the reveal phase.', 'success');
-      await fetchGameData();
-    } catch (error) {
-      console.error('Error submitting moves:', error);
-
-      let errorMessage = 'Failed to submit moves';
-      if (error instanceof Error) {
-        if (error.message.includes('already submitted')) {
-          errorMessage = 'You have already submitted moves for this round';
-          await fetchGameData();
-        } else if (error.message.includes('invalid instruction')) {
-          errorMessage = 'Invalid move data - please try refreshing';
-        } else if (error.message.includes('User rejected')) {
-          errorMessage = 'Transaction cancelled';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-
-      updateToast(toastId, errorMessage, 'error');
-    }
-  };
+  // handleSubmitMoves removed - moves are submitted in Lobby
 
   const handleRevealMoves = async () => {
     if (!publicKey || !gameId || selectedMoves.length !== 5 || !moveSalt) {
@@ -500,13 +442,13 @@ export default function GamePage() {
         isOpen={showMoveModal}
         onClose={() => setShowMoveModal(false)}
         gameState={gameData.state}
-        hasUserSubmittedMoves={hasUserSubmittedMoves()}
+        hasUserSubmittedMoves={true} // In this model, if you are in game, moves are submitted
         hasUserRevealedMoves={hasUserRevealedMoves()}
-        hasOpponentSubmittedMoves={hasOpponentSubmittedMoves()}
+        hasOpponentSubmittedMoves={true} // Both must be joined for InProgress
         selectedMoves={selectedMoves}
         moveSalt={moveSalt}
         onMoveSelect={handleMoveSelect}
-        onSubmitMoves={handleSubmitMoves}
+        onSubmitMoves={() => { }} // Disabled
         onRevealMoves={handleRevealMoves}
       />
     </div>

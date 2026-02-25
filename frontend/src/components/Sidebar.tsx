@@ -4,6 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useNavigate } from 'react-router-dom';
 import ThemeSelector from './ThemeSelector';
 import NetworkSelector from './NetworkSelector';
+import AirdropButton from './AirdropButton';
 import { Gamepad2, Home, Wallet, Swords, Grip, Trees } from 'lucide-react';
 import { theme } from '../theme';
 
@@ -167,6 +168,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobile = false }) => {
                 borderTop: `1px solid ${theme.colors.border}`
             }}>
                 <NetworkSelector />
+                <AirdropButton />
                 <ThemeSelector />
             </div>
         </div>

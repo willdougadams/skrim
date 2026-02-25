@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { BudAccount, findChildBudPda } from './utils';
-import { SkyLayer, OceanLayer, SandLayer } from './BeachBackground';
+import { BeachBackground } from './BeachBackground';
 import { useGameCamera } from './useGameCamera';
 import './TreeVisualizer.css';
 
@@ -50,18 +50,11 @@ const RecursiveBranch: React.FC<{
 }> = ({ node, onSelect, time, currentWind }) => {
 
     // Wind Effect Calculation
-    // Use the pre-calculated windInfluence (0.0 to 1.0+)
     const influence = node.windInfluence;
 
     let windRotation = 0;
     if (influence > 0.01 && !node.isTrunk) {
-        // Direct Drive from Global Wind
-        // We assume 'currentWind' is a force multiplier (-1.0 to 1.0 approx)
-        // We scale this by importance/stiffness (influence)
-        // Tune this scalar (0.1 radian max deflection per segment?)
         const windForce = currentWind * influence * 0.1;
-
-        // Apply
         windRotation = windForce;
     }
 
@@ -144,12 +137,10 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     const [time, setTime] = useState(0);
 
     // Camera setup
-    const { camera, setCamera, containerRef, handleMouseDown } = useGameCamera({
+    const { camera, setCamera, containerRef } = useGameCamera({
         initialScale: 0.8,
         initialX: 0,
         initialY: 0,
-        minScale: 0.1,
-        maxScale: 5,
     });
 
     // Animation Loop for Wind
@@ -163,20 +154,13 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         return () => cancelAnimationFrame(animationFrameId);
     }, []);
 
-    // Handle Resize & Initial Center
+    // Handle Resize
     useEffect(() => {
         if (containerRef.current) {
             const { clientWidth, clientHeight } = containerRef.current;
             setContainerSize({ width: clientWidth, height: clientHeight });
-            if (camera.x === 0 && camera.y === 0) {
-                setCamera(prev => ({
-                    ...prev,
-                    x: clientWidth / 2,
-                    y: clientHeight - 120
-                }));
-            }
         }
-    }, [containerRef, setCamera]);
+    }, [containerRef]);
 
     // Build the Tree Structure
     useEffect(() => {
@@ -185,21 +169,14 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             return;
         }
 
-        // 1. Calculate Absolute Positions (Same as original layout logic)
+        // 1. Calculate Absolute Positions
         const levels: PublicKey[][] = [];
         const nodePositions = new Map<string, NodePosition>();
         const queue: { address: PublicKey, depth: number }[] = [{ address: rootBudAddress, depth: 0 }];
         const levelHeight = 120;
         const SPACING = 80;
 
-        // BFS for Levels
-        // We also need to track how many nodes in each level are "solved" (bloomed)
-        // to determine if a level should be a "trunk".
         const levelStats: { total: number, solved: number }[] = [];
-
-        // Note: queue items contain { address, depth }
-        // We need to initialize levelStats[depth] before using it
-        // The queue initially has the root at depth 0.
         levelStats[0] = { total: 0, solved: 0 };
 
         while (queue.length > 0) {
@@ -208,41 +185,25 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             if (!levels[depth]) levels[depth] = [];
             levels[depth].push(address);
 
-            // Ensure stats exist for this level (BFS ensures we reach depth in order, but safe to check)
             if (!levelStats[depth]) levelStats[depth] = { total: 0, solved: 0 };
-
             levelStats[depth].total++;
 
-            // Check if this node is solved (bloomed)
             const bud = buds.get(address.toString());
             if (bud && bud.isBloomed) {
                 levelStats[depth].solved++;
-
                 const [left] = findChildBudPda(address, 'left');
                 const [right] = findChildBudPda(address, 'right');
-
-                // Prepare next level stats if not exist
                 if (!levelStats[depth + 1]) levelStats[depth + 1] = { total: 0, solved: 0 };
-
                 queue.push({ address: left, depth: depth + 1 });
                 queue.push({ address: right, depth: depth + 1 });
             }
         }
 
-        // Assign Absolute Positions (Center justified)
-        // Apply "Trunk" logic:
-        // A level is a "trunk" if:
-        // 1. It is fully solved (all nodes bloomed).
-        // 2. The *next* level (depth + 1) is at least 75% solved.
         levels.forEach((levelNodes, depth) => {
             const stats = levelStats[depth];
             const nextStats = levelStats[depth + 1];
-
             let isTrunk = false;
-            // Condition: current level fully solved
             if (stats && stats.solved === stats.total && stats.total > 0) {
-                // Condition: next level >= 75% solved
-                // If there is no next level (top of tree), it's not a trunk (it's the canopy)
                 if (nextStats && nextStats.total > 0) {
                     const nextRatio = nextStats.solved / nextStats.total;
                     if (nextRatio >= 0.75) {
@@ -251,10 +212,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                 }
             }
 
-            // Trunk layers get tight spacing (clumping)
-            // Normal layers get standard spacing
             const spacing = isTrunk ? 20 : SPACING;
-
             const count = levelNodes.length;
             const levelWidth = (count - 1) * spacing;
             const startX = -levelWidth / 2;
@@ -262,13 +220,10 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
             levelNodes.forEach((nodeAddr, index) => {
                 const x = startX + (index * spacing);
-                // Store isTrunk info in the position map (or a separate map) 
-                // Hack: We can just use a separate Set for trunk depths since all nodes at depth X share status
                 nodePositions.set(nodeAddr.toString(), { x, y });
             });
         });
 
-        // Helper: Identify trunk depths
         const trunkDepths = new Set<number>();
         levels.forEach((_, depth) => {
             const stats = levelStats[depth];
@@ -279,7 +234,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             }
         });
 
-        // 2. Build Recursive Tree Data with Relative Transforms
+        // 2. Build Recursive Tree Data
         const buildNodeData = (address: PublicKey): TreeNodeData | undefined => {
             const addrStr = address.toString();
             const pos = nodePositions.get(addrStr);
@@ -303,19 +258,17 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                 depth: currentDepth,
                 isBloomed: bud?.isBloomed ?? false,
                 isFruit: bud?.isFruit ?? false,
-                isTrunk: trunkDepths.has(currentDepth), // New property
+                isTrunk: trunkDepths.has(currentDepth),
                 restX: pos.x,
                 restY: pos.y,
                 left: leftNode,
                 right: rightNode,
-
                 angle: 0,
                 length: 0,
-                windInfluence: 0 // Will calculate later
+                windInfluence: 0
             };
         };
 
-        // Helper to populate angles/lengths (Top-Down)
         const populateGeometry = (
             node: TreeNodeData,
             parentX: number,
@@ -324,16 +277,10 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         ): TreeNodeData => {
             const myX = node.restX;
             const myY = node.restY;
-
-            // Vector from Parent to Me
-            // Screen Coords: Parent(parentX, -parentY) -> Me(myX, -myY)
             const dx = myX - parentX;
             const dy = (-myY) - (-parentY);
-
             const length = Math.sqrt(dx * dx + dy * dy);
             const globalAngle = Math.atan2(dy, dx);
-
-            // Relative Angle
             const angle = globalAngle - parentGlobalAngle;
 
             const newNode: TreeNodeData = {
@@ -348,9 +295,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             return newNode;
         }
 
-        // Calculate Wind Influence (Bottom-Up)
         const calculateWindInfluence = (node: TreeNodeData): number => {
-            // Base case: Leaf (no children)
             if (!node.left && !node.right) {
                 node.windInfluence = 1.0;
                 return 1.0;
@@ -360,48 +305,58 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             if (node.left) totalChildForce += calculateWindInfluence(node.left);
             if (node.right) totalChildForce += calculateWindInfluence(node.right);
 
-            // Decay
-            // User requested 66% reduction per level -> 0.34 retention.
             let myInfluence = totalChildForce * 0.34;
-
-            // Cutoff
             if (myInfluence < 0.01) myInfluence = 0;
 
             node.windInfluence = myInfluence;
             return myInfluence;
         }
 
-        // Build Raw Tree
         const rawRoot = buildNodeData(rootBudAddress);
 
         if (rawRoot) {
-            // Orientation Fix:
-            // Root is at (0,0). 
-            // We want the coordinate system to start neutral (Right).
-            // Parent angle = 0.
             const processedRoot = populateGeometry(rawRoot, 0, 0, 0);
-
-            // Calculate physics
             calculateWindInfluence(processedRoot);
-
             setTreeRoot(processedRoot);
+
+            // 3. Auto-size View
+            if (nodePositions.size > 0 && containerSize.width > 0) {
+                let minX = 0, maxX = 0, minY = 0, maxY = 0;
+                nodePositions.forEach((pos) => {
+                    if (pos.x < minX) minX = pos.x;
+                    if (pos.x > maxX) maxX = pos.x;
+                    if (pos.y < minY) minY = pos.y;
+                    if (pos.y > maxY) maxY = pos.y;
+                });
+
+                const padding = 60;
+                const treeWidth = maxX - minX + padding * 2;
+                const treeHeight = maxY - minY + padding * 2;
+
+                // Constraints:
+                // Tree fits in top 85% (Sky + Ocean).
+                // Root anchored at 92.5% (center of 15% sand).
+                const rootYFloor = containerSize.height * 0.925;
+                const skyOceanHeight = containerSize.height * 0.85;
+                const availableHeight = skyOceanHeight - 40; // top padding
+
+                const scaleX = containerSize.width / treeWidth;
+                const scaleY = availableHeight / treeHeight;
+                const newScale = Math.min(scaleX, scaleY, 1.0);
+
+                const worldCenterX = (minX + maxX) / 2;
+
+                setCamera({
+                    x: containerSize.width / 2 - (worldCenterX * newScale),
+                    y: rootYFloor,
+                    scale: newScale
+                });
+            }
         }
 
         setLoading(false);
 
-    }, [rootBudAddress, buds]);
-
-    const handleRecenter = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (containerRef.current) {
-            const { clientWidth, clientHeight } = containerRef.current;
-            setCamera({
-                x: clientWidth / 2,
-                y: clientHeight - 120,
-                scale: 0.8
-            });
-        }
-    };
+    }, [rootBudAddress, buds, containerSize, setCamera]);
 
     const t = time / 1000;
     const w1 = Math.sin((t / 13) * 2 * Math.PI) * 0.2;
@@ -409,15 +364,15 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     const w3 = Math.sin((t / 5) * 2 * Math.PI) * 0.1;
     const w4 = Math.sin((t / 3) * 2 * Math.PI) * 0.1;
 
-    // Total wind force (-1.0 to 1.0 range approx)
     const currentWind = w1 + w2 + w3 + w4;
 
     return (
         <div
             ref={containerRef}
             className="tree-visualizer-container"
-            onMouseDown={handleMouseDown}
         >
+            <BeachBackground />
+            
             <div
                 className="tree-world-viewport"
                 style={{
@@ -425,15 +380,9 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                     transformOrigin: '0 0'
                 }}
             >
-                {/* Background is now part of the world! */}
-                <SkyLayer />
-                <OceanLayer />
-                <SandLayer />
-
                 <div style={{ position: 'absolute', top: 0, left: 0, width: 0, height: 0 }}>
                     {treeRoot && (
                         <>
-                            {/* Render Root Node Visual */}
                             <div
                                 className={`tree-node ${treeRoot.isFruit ? 'node-fruit' : treeRoot.isBloomed ? 'node-bloomed' : 'node-leaf'}`}
                                 style={{
@@ -449,7 +398,6 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                                 title={`Depth: 0\n${treeRoot.address}`}
                             />
 
-                            {/* Render Children (Branches) */}
                             <div style={{ position: 'absolute', top: 0, left: 0 }}>
                                 {treeRoot.left && <RecursiveBranch node={treeRoot.left} onSelect={onBudSelect} time={time} currentWind={currentWind} />}
                                 {treeRoot.right && <RecursiveBranch node={treeRoot.right} onSelect={onBudSelect} time={time} currentWind={currentWind} />}
@@ -457,17 +405,6 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                         </>
                     )}
                 </div>
-            </div>
-
-            <div style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', alignItems: 'center', gap: '12px', color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', pointerEvents: 'none', zIndex: 100 }}>
-                <span>Pan: Drag • Zoom: Scroll</span>
-                <button
-                    onClick={handleRecenter}
-                    style={{ pointerEvents: 'auto', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', color: 'white', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', backdropFilter: 'blur(4px)' }}
-                    className="hover:bg-white/30 transition-colors"
-                >
-                    Recenter
-                </button>
             </div>
 
             {loading && <div className="tree-loading-overlay">Growing Tree...</div>}

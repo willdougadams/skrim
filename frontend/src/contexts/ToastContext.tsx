@@ -22,7 +22,7 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 3000): string => {
+  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 30000): string => {
     const id = `toast-${Date.now()}-${Math.random()}`;
     const toast: Toast = { id, message, type, duration };
 
@@ -51,7 +51,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     if (type !== 'loading') {
       setTimeout(() => {
         dismissToast(id);
-      }, 3000);
+      }, 30000);
     }
   }, [dismissToast]);
 

@@ -28,87 +28,47 @@ export const MAX_ROUNDS = 1;
  * Instruction discriminators matching the Rust program
  */
 export enum InstructionType {
-  CreateGame = 0,
-  JoinGame = 1,
-  SubmitMoves = 2,
-  RevealMoves = 3,
-  ClaimPrize = 4,
-  JoinPool = 5,
-  LeavePool = 6,
-  MatchPlayer = 7,
+  CreateChallenge = 0,
+  AcceptChallenge = 1,
+  RevealMoves = 2,
+  ClaimPrize = 3,
 }
 
 export class TransactionPacker {
   /**
-   * Pack CreateGame instruction
-   * Format: [discriminator: u8][max_players: u8][buy_in_lamports: u64][name_len: u8][name: [u8; name_len]][description_len: u8][description: [u8; description_len]]
+   * Pack CreateChallenge instruction
+   * Format: [disc: u8][buy_in: u64][hash: [u8; 32]][name_len: u8][name: [u8; name_len]]
    */
-  static packCreateGame(buyInLamports: bigint, name: string = '', description: string = ''): Uint8Array {
-    const nameBytes = new TextEncoder().encode(name);
-    const descriptionBytes = new TextEncoder().encode(description);
+  static packCreateChallenge(buyInLamports: bigint, movesHash: Uint8Array, name: string = ''): Uint8Array {
+    const nameBytes = new TextEncoder().encode(name.slice(0, 64));
 
-    // Validate lengths (on-chain limits: 64 for name, 256 for description)
-    if (nameBytes.length > 64) {
-      throw new Error(`Game name too long: ${nameBytes.length} bytes (max 64)`);
-    }
-    if (descriptionBytes.length > 256) {
-      throw new Error(`Game description too long: ${descriptionBytes.length} bytes (max 256)`);
-    }
-
-    // Calculate total size
-    // 1 (discriminator) + 8 (buy_in) + 1 (name_len) + name + 1 (desc_len) + description
-    const size = 11 + nameBytes.length + descriptionBytes.length;
+    // 1 (disc) + 8 (buy_in) + 32 (hash) + 1 (name_len) + name
+    const size = 42 + nameBytes.length;
     const data = new Uint8Array(size);
     const view = new DataView(data.buffer);
 
-    let offset = 0;
-
-    // Discriminator
-    view.setUint8(offset, InstructionType.CreateGame);
-    offset += 1;
-
-    // Buy-in lamports (little-endian u64)
-    view.setBigUint64(offset, buyInLamports, true);
-    offset += 8;
-
-    // Name length and bytes
-    view.setUint8(offset, nameBytes.length);
-    offset += 1;
-    data.set(nameBytes, offset);
-    offset += nameBytes.length;
-
-    // Description length and bytes
-    view.setUint8(offset, descriptionBytes.length);
-    offset += 1;
-    data.set(descriptionBytes, offset);
+    view.setUint8(0, InstructionType.CreateChallenge);
+    view.setBigUint64(1, buyInLamports, true);
+    data.set(movesHash, 9);
+    view.setUint8(41, nameBytes.length);
+    data.set(nameBytes, 42);
 
     return data;
   }
 
   /**
-   * Pack JoinGame instruction
-   * Format: [discriminator: u8][player_slot: u8]
+   * Pack AcceptChallenge instruction
+   * Format: [disc: u8][move1: u8]...[move5: u8]
    */
-  static packJoinGame(playerSlot: number): Uint8Array {
-    if (playerSlot < 0 || playerSlot >= MAX_PLAYERS) {
-      throw new Error(`Invalid player slot: must be 0-${MAX_PLAYERS - 1}`);
+  static packAcceptChallenge(moves: Move[]): Uint8Array {
+    if (moves.length !== 5) {
+      throw new Error('Must provide exactly 5 moves');
     }
-    return new Uint8Array([InstructionType.JoinGame, playerSlot]);
-  }
-
-  /**
-   * Pack SubmitMoves instruction
-   * Format: [discriminator: u8][moves_hash: [u8; 32]]
-   */
-  static packSubmitMoves(movesHash: Uint8Array): Uint8Array {
-    if (movesHash.length !== 32) {
-      throw new Error('Moves hash must be exactly 32 bytes');
+    const data = new Uint8Array(6);
+    data[0] = InstructionType.AcceptChallenge;
+    for (let i = 0; i < 5; i++) {
+      data[1 + i] = moves[i];
     }
-
-    const data = new Uint8Array(33); // 1 + 32
-    data[0] = InstructionType.SubmitMoves;
-    data.set(movesHash, 1);
-
     return data;
   }
 
@@ -145,42 +105,6 @@ export class TransactionPacker {
     return new Uint8Array([InstructionType.ClaimPrize]);
   }
 
-  /**
-   * Pack JoinPool instruction
-   * Format: [discriminator: u8][entry_fee: u64]
-   */
-  static packJoinPool(entryFee: bigint): Uint8Array {
-    const data = new Uint8Array(9);
-    const view = new DataView(data.buffer);
-    view.setUint8(0, InstructionType.JoinPool);
-    view.setBigUint64(1, entryFee, true);
-    return data;
-  }
-
-  /**
-   * Pack LeavePool instruction
-   * Format: [discriminator: u8]
-   */
-  static packLeavePool(): Uint8Array {
-    return new Uint8Array([InstructionType.LeavePool]);
-  }
-
-  /**
-   * Pack MatchPlayer instruction
-   * Format: [discriminator: u8][name_len: u8][name: [u8; name_len]]
-   */
-  static packMatchPlayer(name: string): Uint8Array {
-    const nameBytes = new TextEncoder().encode(name);
-    if (nameBytes.length > 64) {
-      throw new Error(`Game name too long: ${nameBytes.length} bytes (max 64)`);
-    }
-
-    const data = new Uint8Array(2 + nameBytes.length);
-    data[0] = InstructionType.MatchPlayer;
-    data[1] = nameBytes.length;
-    data.set(nameBytes, 2);
-    return data;
-  }
 
   /**
    * Hash moves with salt (matching the program's implementation)
@@ -269,8 +193,7 @@ export class GameAccountDeserializer {
     const max_players = view.getUint8(offset); offset += 1;
     const current_players = view.getUint8(offset); offset += 1;
     const state = view.getUint8(offset); offset += 1;
-    offset += 3; // _padding
-
+    offset += 5; // _padding (354 + 1 + 5 = 360, matching OFFSET_LAST_ACTION)
     const last_action_timestamp = view.getBigInt64(offset, true); offset += 8;
     const buy_in_lamports = view.getBigUint64(offset, true); offset += 8;
     const prize_pool = view.getBigUint64(offset, true); offset += 8;

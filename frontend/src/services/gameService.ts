@@ -16,6 +16,7 @@ interface GameIndexEntry {
     current_round?: number;
     total_rounds?: number;
     winner?: string;
+    player_addresses: string[];
 }
 
 export class GameService {
@@ -35,10 +36,12 @@ export class GameService {
         try {
             console.log('Fetching all game accounts using getProgramAccounts...');
 
-            // Get all accounts owned by our program (no size filter - let's see all of them)
+            // Get only accounts with the correct size (528 bytes for GameAccount)
             const accounts = await this.connection.getProgramAccounts(this.programId, {
-                commitment: 'confirmed'
-                // Remove size filter to see all accounts
+                commitment: 'confirmed',
+                filters: [
+                    { dataSize: 528 }
+                ]
             });
 
             console.log(`Found ${accounts.length} accounts owned by program`);
@@ -74,6 +77,7 @@ export class GameService {
                             current_round: gameData.current_round,
                             total_rounds: gameData.total_rounds,
                             winner: winner,
+                            player_addresses: gameData.players.map((p: any) => p.pubkey),
                         };
 
                         games.push(gameEntry);
@@ -112,9 +116,20 @@ export class GameService {
     async fetchWaitingPool(): Promise<Array<{ player: string, entry_fee: bigint, timestamp: number }>> {
         try {
             console.log('Fetching waiting pool...');
-            const accounts = await this.connection.getProgramAccounts(this.programId, {
-                commitment: 'confirmed'
+
+            // Add timeout to prevent hanging on slow RPC
+            const fetchPromise = this.connection.getProgramAccounts(this.programId, {
+                commitment: 'confirmed',
+                filters: [
+                    { dataSize: 48 }
+                ]
             });
+
+            const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('RPC Timeout fetching pool')), 10000)
+            );
+
+            const accounts = await Promise.race([fetchPromise, timeoutPromise]) as any[];
 
             const pool = [];
             for (const { account } of accounts) {
@@ -183,14 +198,14 @@ export class GameService {
             name: game.name,
             description: game.description,
             status: this.mapGameStateToStatus(game.state),
-            players: new Array(game.current_players).fill(''),
+            players: game.player_addresses,
             maxPlayers: game.max_players,
             createdAt: new Date(game.created_at * 1000).toISOString().split('T')[0],
             buyInSOL: GameAccountDeserializer.lamportsToSol(game.buy_in_lamports),
             creator: game.creator,
             prizePool: GameAccountDeserializer.lamportsToSol(game.buy_in_lamports) * game.max_players,
-            currentRound: game.current_round,
-            totalRounds: game.total_rounds,
+            current_round: game.current_round,
+            total_rounds: game.total_rounds,
             winner: game.winner
         }));
     }

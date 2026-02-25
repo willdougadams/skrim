@@ -383,47 +383,72 @@ export function MoveSubmissionModal({
         )}
 
         {/* Reveal Moves */}
-        {gameState === 'in_progress' && hasUserSubmittedMoves && !hasUserRevealedMoves && selectedMoves.length === 5 && moveSalt && (
+        {gameState === 'in_progress' && hasUserSubmittedMoves && !hasUserRevealedMoves && (
           <div>
             <h2 style={{ color: theme.colors.text.primary, marginBottom: '1.5rem', textAlign: 'center' }}>
               {hasOpponentSubmittedMoves ? 'Reveal Your Moves' : 'Waiting for Opponent'}
             </h2>
-            <p style={{ color: theme.colors.text.secondary, marginBottom: '2rem', textAlign: 'center' }}>
-              {hasOpponentSubmittedMoves
-                ? 'Time to reveal the moves you submitted.'
-                : 'Your opponent must commit their moves before you can reveal.'}
-            </p>
 
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '1.5rem',
-              marginBottom: '2rem',
-              flexWrap: 'wrap'
-            }}>
-              {selectedMoves.map((move, index) => {
-                const Icon = move === 'rock' ? Circle : move === 'paper' ? FileText : Scissors;
-                return (
-                  <div key={index} style={{ textAlign: 'center' }}>
-                    <div style={{
-                      marginBottom: '0.5rem',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      color: theme.colors.text.primary
-                    }}>
-                      <Icon size={48} fill={move === 'rock' ? 'currentColor' : 'none'} />
-                    </div>
-                    <div style={{
-                      fontSize: '0.9rem',
-                      color: theme.colors.text.secondary,
-                      textTransform: 'capitalize'
-                    }}>
-                      {move}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {(selectedMoves.length !== 5 || !moveSalt) ? (
+              <div style={{
+                padding: '2rem',
+                backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                borderRadius: '12px',
+                border: `2px solid ${theme.colors.error}`,
+                textAlign: 'center',
+                marginBottom: '2rem'
+              }}>
+                <p style={{ color: theme.colors.error, fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                  Moves Not Found Locally
+                </p>
+                <p style={{ color: theme.colors.text.secondary, fontSize: '0.9rem' }}>
+                  It looks like the moves you committed for this challenge are not in your browser's local storage.
+                  This can happen if you cleared your cache, are on a different device, or used a different browser.
+                </p>
+                <p style={{ color: theme.colors.text.secondary, fontSize: '0.9rem', marginTop: '1rem' }}>
+                  Without the original salt and moves, you won't be able to reveal.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p style={{ color: theme.colors.text.secondary, marginBottom: '2rem', textAlign: 'center' }}>
+                  {hasOpponentSubmittedMoves
+                    ? 'Time to reveal the moves you submitted.'
+                    : 'Your opponent must commit their moves before you can reveal.'}
+                </p>
+
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '1.5rem',
+                  marginBottom: '2rem',
+                  flexWrap: 'wrap'
+                }}>
+                  {selectedMoves.map((move, index) => {
+                    const Icon = move === 'rock' ? Circle : move === 'paper' ? FileText : Scissors;
+                    return (
+                      <div key={index} style={{ textAlign: 'center' }}>
+                        <div style={{
+                          marginBottom: '0.5rem',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          color: theme.colors.text.primary
+                        }}>
+                          <Icon size={48} fill={move === 'rock' ? 'currentColor' : 'none'} />
+                        </div>
+                        <div style={{
+                          fontSize: '0.9rem',
+                          color: theme.colors.text.secondary,
+                          textTransform: 'capitalize'
+                        }}>
+                          {move}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
               <button
@@ -439,28 +464,30 @@ export function MoveSubmissionModal({
                   fontWeight: 'bold'
                 }}
               >
-                Cancel
+                {(selectedMoves.length !== 5 || !moveSalt) ? 'Close' : 'Cancel'}
               </button>
-              <button
-                onClick={() => {
-                  onRevealMoves();
-                  onClose();
-                }}
-                disabled={!hasOpponentSubmittedMoves}
-                style={{
-                  padding: '1rem 2rem',
-                  backgroundColor: hasOpponentSubmittedMoves ? '#9c27b0' : '#999',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: hasOpponentSubmittedMoves ? 'pointer' : 'not-allowed',
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  opacity: hasOpponentSubmittedMoves ? 1 : 0.6
-                }}
-              >
-                {hasOpponentSubmittedMoves ? 'Reveal Moves' : 'Waiting for Opponent'}
-              </button>
+              {selectedMoves.length === 5 && moveSalt && (
+                <button
+                  onClick={() => {
+                    onRevealMoves();
+                    onClose();
+                  }}
+                  disabled={!hasOpponentSubmittedMoves}
+                  style={{
+                    padding: '1rem 2rem',
+                    backgroundColor: hasOpponentSubmittedMoves ? '#9c27b0' : '#999',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: hasOpponentSubmittedMoves ? 'pointer' : 'not-allowed',
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    opacity: hasOpponentSubmittedMoves ? 1 : 0.6
+                  }}
+                >
+                  {hasOpponentSubmittedMoves ? 'Reveal Moves' : 'Waiting for Opponent'}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -470,15 +497,15 @@ export function MoveSubmissionModal({
           (hasUserSubmittedMoves && !hasUserRevealedMoves && (!selectedMoves.length || !moveSalt)) ||
           hasUserRevealedMoves
         ) && (
-          <div style={{ textAlign: 'center', padding: '2rem' }}>
-            <h2 style={{ color: theme.colors.success, marginBottom: '1rem' }}>All Set!</h2>
-            <p style={{ color: theme.colors.text.secondary }}>
-              {!hasUserRevealedMoves
-                ? 'Waiting for opponent to submit their moves...'
-                : 'Waiting for your matchup to be resolved...'}
-            </p>
-          </div>
-        )}
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <h2 style={{ color: theme.colors.success, marginBottom: '1rem' }}>All Set!</h2>
+              <p style={{ color: theme.colors.text.secondary }}>
+                {!hasUserRevealedMoves
+                  ? 'Waiting for opponent to submit their moves...'
+                  : 'Waiting for your matchup to be resolved...'}
+              </p>
+            </div>
+          )}
       </div>
     </div>
   );

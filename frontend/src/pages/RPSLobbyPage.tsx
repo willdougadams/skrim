@@ -3,7 +3,7 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createWeb3ProgramClient } from '../services/web3ProgramClient';
 import { GameService } from '../services/gameService';
-import { Swords, Grip, Timer, Users, Search } from 'lucide-react';
+import { Swords, Grip, Timer, Users, Search, X, Circle, FileText, Scissors } from 'lucide-react';
 import { theme } from '../theme';
 import { useToast } from '../contexts/ToastContext';
 import { useGames } from '../contexts/GamesContext';
@@ -12,129 +12,209 @@ import { useGames } from '../contexts/GamesContext';
 // NewGameConfig removed
 
 // NewGameModal removed
-function QuickplayModal({ isOpen, onClose, entryFee, status, onJoin, onLeave }: {
+interface Challenge {
+  id: string;
+  creator: string;
+  name: string;
+  buyInSOL: number;
+  state: string;
+  status: 'waiting' | 'in_progress' | 'completed';
+  players: string[];
+}
+
+function CreateChallengeModal({ isOpen, onClose, onCreate }: {
   isOpen: boolean;
   onClose: () => void;
-  entryFee: number;
-  status: 'idle' | 'searching' | 'matched';
-  onJoin: () => void;
-  onLeave: () => void;
+  onCreate: (entryFee: number, moves: number[]) => void;
 }) {
+  const [entryFee, setEntryFee] = useState(0.1);
+  const [moves, setMoves] = useState<number[]>([]);
+  const [step, setStep] = useState<'config' | 'moves'>('config');
+
   if (!isOpen) return null;
+
+  const handleMoveSelect = (index: number, move: number) => {
+    const newMoves = [...moves];
+    newMoves[index] = move;
+    setMoves(newMoves);
+  };
 
   return (
     <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: '1rem',
-      backdropFilter: 'blur(4px)'
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      padding: '1rem', backdropFilter: 'blur(8px)'
     }}>
       <div style={{
-        backgroundColor: theme.colors.surface,
-        padding: '2rem',
-        borderRadius: '16px',
-        maxWidth: '400px',
-        width: '100%',
-        textAlign: 'center',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
-        border: `1px solid ${theme.colors.border}`
+        backgroundColor: theme.colors.surface, padding: '2rem',
+        borderRadius: '16px', maxWidth: '500px', width: '100%',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)', border: `1px solid ${theme.colors.border}`
       }}>
-        <div style={{ marginBottom: '1.5rem' }}>
-          {status === 'searching' ? (
-            <div style={{ position: 'relative', width: '80px', height: '80px', margin: '0 auto' }}>
-              <div className="searching-spinner" style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '50%',
-                border: `3px solid ${theme.colors.primary.main}`,
-                borderTopColor: 'transparent',
-                animation: 'spin 1s linear infinite'
-              }} />
-              <Search size={32} color={theme.colors.primary.main} style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)'
-              }} />
-            </div>
-          ) : (
-            <Users size={48} color={theme.colors.primary.main} style={{ margin: '0 auto' }} />
-          )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+          <h2 style={{ color: theme.colors.text.primary, margin: 0 }}>Create Challenge</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: theme.colors.text.secondary, cursor: 'pointer' }}><X size={24} /></button>
         </div>
 
-        <h2 style={{ color: theme.colors.text.primary, marginBottom: '0.5rem' }}>
-          {status === 'searching' ? 'Searching for Opponent...' : 'Quickplay Match'}
-        </h2>
+        {step === 'config' ? (
+          <div>
+            <label style={{ color: theme.colors.text.secondary, display: 'block', marginBottom: '0.5rem' }}>Entry Fee (SOL)</label>
+            <input
+              type="number"
+              value={entryFee}
+              onChange={e => setEntryFee(parseFloat(e.target.value))}
+              style={{
+                width: '100%', padding: '1rem', borderRadius: '8px',
+                backgroundColor: theme.colors.background, border: `1px solid ${theme.colors.border}`,
+                color: theme.colors.text.primary, fontSize: '1.1rem', marginBottom: '2rem'
+              }}
+            />
+            <button
+              onClick={() => setStep('moves')}
+              style={{
+                width: '100%', padding: '1rem', backgroundColor: theme.colors.primary.main,
+                color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer'
+              }}
+            >
+              Continue to Move Selection
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p style={{ color: theme.colors.text.secondary, marginBottom: '1.5rem' }}>Select your 5 moves for the challenge:</p>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '2rem' }}>
+              {[0, 1, 2, 3, 4].map(i => (
+                <div key={i} style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  backgroundColor: moves[i] !== undefined ? theme.colors.success : theme.colors.border,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.8rem'
+                }}>
+                  {i + 1}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+              {(['Rock', 'Paper', 'Scissors'] as const).map((m, idx) => (
+                <button
+                  key={m}
+                  onClick={() => {
+                    if (moves.length < 5) handleMoveSelect(moves.length, idx);
+                  }}
+                  style={{
+                    padding: '1rem', borderRadius: '8px', border: `1px solid ${theme.colors.border}`,
+                    backgroundColor: theme.colors.background, color: theme.colors.text.primary,
+                    cursor: moves.length < 5 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '1rem'
+                  }}
+                >
+                  {m === 'Rock' ? <Circle size={20} /> : m === 'Paper' ? <FileText size={20} /> : <Scissors size={20} />}
+                  {m}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button onClick={() => setStep('config')} style={{ flex: 1, padding: '1rem', borderRadius: '8px', border: `1px solid ${theme.colors.border}`, background: 'none', color: theme.colors.text.secondary, cursor: 'pointer' }}>Back</button>
+              <button
+                onClick={() => onCreate(entryFee, moves)}
+                disabled={moves.length < 5}
+                style={{
+                  flex: 2, padding: '1rem', backgroundColor: theme.colors.success,
+                  color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold',
+                  cursor: moves.length === 5 ? 'pointer' : 'not-allowed', opacity: moves.length === 5 ? 1 : 0.6
+                }}
+              >
+                Create for {entryFee} SOL
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AcceptChallengeModal({ isOpen, onClose, onAccept, challenge }: {
+  isOpen: boolean;
+  onClose: () => void;
+  onAccept: (moves: number[]) => void;
+  challenge: Challenge | null;
+}) {
+  const [moves, setMoves] = useState<number[]>([]);
+
+  if (!isOpen || !challenge) return null;
+
+  const handleMoveSelect = (index: number, move: number) => {
+    const newMoves = [...moves];
+    newMoves[index] = move;
+    setMoves(newMoves);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      padding: '1rem', backdropFilter: 'blur(8px)'
+    }}>
+      <div style={{
+        backgroundColor: theme.colors.surface, padding: '2rem',
+        borderRadius: '16px', maxWidth: '500px', width: '100%',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)', border: `1px solid ${theme.colors.border}`
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+          <h2 style={{ color: theme.colors.text.primary, margin: 0 }}>Accept Challenge</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: theme.colors.text.secondary, cursor: 'pointer' }}><X size={24} /></button>
+        </div>
 
         <p style={{ color: theme.colors.text.secondary, marginBottom: '2rem' }}>
-          {status === 'searching'
-            ? `Waiting for someone to match your ${entryFee} SOL entry fee.`
-            : `Instantly battle 1v1 for ${entryFee * 2} SOL prizes.`}
+          Accepting challenge from <strong>{challenge.creator.slice(0, 4)}...{challenge.creator.slice(-4)}</strong> for <strong>{challenge.buyInSOL} SOL</strong>.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {status === 'idle' && (
-            <button
-              onClick={onJoin}
-              style={{
-                padding: '1rem',
-                backgroundColor: theme.colors.primary.main,
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1.1rem',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              Join Matchmaking
-            </button>
-          )}
-
-          {status === 'searching' && (
-            <button
-              onClick={onLeave}
-              style={{
-                padding: '0.75rem',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                color: theme.colors.text.primary,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
-              Cancel Search
-            </button>
-          )}
-
-          {status !== 'searching' && (
-            <button
-              onClick={onClose}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: theme.colors.text.secondary,
-                cursor: 'pointer'
-              }}
-            >
-              Close
-            </button>
-          )}
+        <p style={{ color: theme.colors.text.secondary, marginBottom: '1.5rem' }}>Select your 5 moves:</p>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '2rem' }}>
+          {[0, 1, 2, 3, 4].map(i => (
+            <div key={i} style={{
+              width: '32px', height: '32px', borderRadius: '50%',
+              backgroundColor: moves[i] !== undefined ? theme.colors.success : theme.colors.border,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.8rem'
+            }}>
+              {i + 1}
+            </div>
+          ))}
         </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+          {(['Rock', 'Paper', 'Scissors'] as const).map((m, idx) => (
+            <button
+              key={m}
+              onClick={() => {
+                if (moves.length < 5) handleMoveSelect(moves.length, idx);
+              }}
+              style={{
+                padding: '1rem', borderRadius: '8px', border: `1px solid ${theme.colors.border}`,
+                backgroundColor: theme.colors.background, color: theme.colors.text.primary,
+                cursor: moves.length < 5 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '1rem'
+              }}
+            >
+              {idx === 0 ? <Circle size={20} /> : idx === 1 ? <FileText size={20} /> : <Scissors size={20} />}
+              {m}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={() => onAccept(moves)}
+          disabled={moves.length < 5}
+          style={{
+            width: '100%', padding: '1rem', backgroundColor: theme.colors.primary.main,
+            color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold',
+            cursor: moves.length === 5 ? 'pointer' : 'not-allowed', opacity: moves.length === 5 ? 1 : 0.6
+          }}
+        >
+          Join & Submit Moves
+        </button>
       </div>
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
@@ -144,97 +224,91 @@ export default function RPSLobbyPage() {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   const wallet = useWallet();
-  const { showToast } = useToast();
+  const { showToast, updateToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [showQuickplayModal, setShowQuickplayModal] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'searching' | 'matched'>('idle');
-  const [waitingPlayers, setWaitingPlayers] = useState<any[]>([]);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [acceptingChallenge, setAcceptingChallenge] = useState<Challenge | null>(null);
 
-  // handleGameCreated removed
+  const refreshChallenges = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const rpsService = new GameService(connection);
+      const allGames = await rpsService.getFormattedGamesForLobby();
+      // Filter for open challenges OR challenges I am part of
+      setChallenges(allGames.filter(g =>
+        g.status === 'waiting' ||
+        (g.status === 'in_progress' && publicKey && g.players.includes(publicKey.toString()))
+      ) as any);
+    } catch (e) {
+      console.error('Failed to refresh challenges:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [connection]);
 
-  const handleJoinPool = async () => {
+  useEffect(() => {
+    refreshChallenges();
+    const interval = setInterval(refreshChallenges, 10000);
+    return () => clearInterval(interval);
+  }, [refreshChallenges]);
+
+  const handleCreateChallenge = async (fee: number, moves: number[]) => {
     if (!publicKey) return;
+    const toastId = showToast('Creating challenge...', 'loading');
     try {
       const client = createWeb3ProgramClient(connection, wallet);
-      const rpsService = new GameService(connection);
+      const salt = BigInt(Math.floor(Math.random() * 1000000)); // Simple salt for now
 
-      setStatus('searching');
-      setShowQuickplayModal(true);
+      const result = await client.createChallenge({
+        entryFee: fee,
+        gameName: `Challenge by ${publicKey.toString().slice(0, 4)}`,
+        moves: moves,
+        salt: salt
+      });
 
-      // 1. Scan for existing players
-      const pool = await rpsService.fetchWaitingPool();
-      const opponent = pool.find(p => p.player !== publicKey.toString() && Number(p.entry_fee) === 100_000_000);
+      // Save moves to localStorage for Reveal phase
+      const key = `${publicKey.toString()}-${result.gameId}-0`;
+      localStorage.setItem(key, JSON.stringify({
+        moves: moves.map(m => m === 0 ? 'rock' : m === 1 ? 'paper' : 'scissors'),
+        salt: salt.toString(),
+        timestamp: Date.now()
+      }));
 
-      if (opponent) {
-        showToast('Found opponent! Matching...', 'success');
-        const matchResult = await client.matchPlayer(opponent.player, `Quickplay vs ${opponent.player.slice(0, 4)}`);
-        setStatus('matched');
-        navigate(`/game/${matchResult.gameId}`);
-        return;
-      }
-
-      // 2. If no opponent, join pool
-      await client.joinPool(0.1);
-      showToast('Waiting for opponent...', 'success');
+      updateToast(toastId, 'Challenge created!', 'success');
+      setShowCreateModal(false);
+      navigate(`/game/${result.gameId}`);
     } catch (e: any) {
       console.error(e);
-      setStatus('idle');
-      showToast(e.message || 'Failed to join matchmaking', 'error');
+      updateToast(toastId, e.message || 'Failed to create challenge', 'error');
     }
   };
 
-  const handleLeavePool = async () => {
+  const handleAcceptChallenge = async (moves: number[]) => {
+    if (!publicKey || !acceptingChallenge) return;
+    const toastId = showToast('Accepting challenge...', 'loading');
     try {
       const client = createWeb3ProgramClient(connection, wallet);
-      await client.leavePool();
-      setStatus('idle');
-      showToast('Left matchmaking pool', 'info');
-    } catch (e) {
+      await client.acceptChallenge(acceptingChallenge.id, moves);
+
+      // Save moves to localStorage so they show up in UI
+      const key = `${publicKey.toString()}-${acceptingChallenge.id}-0`;
+      localStorage.setItem(key, JSON.stringify({
+        moves: moves.map(m => m === 0 ? 'rock' : m === 1 ? 'paper' : 'scissors'),
+        salt: "0", // No salt needed for acceptor but keep format
+        timestamp: Date.now()
+      }));
+
+      updateToast(toastId, 'Challenge accepted!', 'success');
+      navigate(`/game/${acceptingChallenge.id}`);
+    } catch (e: any) {
       console.error(e);
-      showToast('Failed to leave pool', 'error');
+      updateToast(toastId, e.message || 'Failed to accept challenge', 'error');
     }
   };
-
-  // Subscription to watch for matches
-  useEffect(() => {
-    if (status !== 'searching' || !publicKey) return;
-
-    const rpsService = new GameService(connection);
-
-    const interval = setInterval(async () => {
-      // Check if our waiting account still exists
-      const client = createWeb3ProgramClient(connection, wallet);
-      const address = await client.getWaitingAccountAddress(publicKey);
-      const info = await connection.getAccountInfo(address);
-
-      if (!info) {
-        // We've been matched! Our account was closed.
-        // Now find the game we were matched into.
-        // In a real app, we'd use a more robust way to find the game (e.g. index/registry or recent games)
-        // For now, let's refresh games and look for one where we are player 2 and state is InProgress
-        const games = await rpsService.fetchAllGames();
-        const myGame = games.find(g =>
-          g.state === 'InProgress' &&
-          g.name.includes('Quickplay') // Could be more specific
-        );
-
-        if (myGame) {
-          clearInterval(interval);
-          setStatus('matched');
-          showToast('Matched! Entering game...', 'success');
-          navigate(`/game/${myGame.game_address}`);
-        }
-      }
-
-      // Also update waiting player count
-      const pool = await rpsService.fetchWaitingPool();
-      setWaitingPlayers(pool);
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [status, publicKey, connection, navigate, wallet]);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -271,81 +345,76 @@ export default function RPSLobbyPage() {
         {/* Create Tournament button removed */}
       </div>
 
-      {/* Quickplay Section */}
       <div style={{
-        marginBottom: '2rem',
-        padding: '1.5rem',
-        backgroundColor: 'rgba(78, 93, 243, 0.05)',
-        borderRadius: '12px',
-        border: `1px solid ${theme.colors.primary.main}44`,
-        display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '1.5rem'
+        padding: '1rem', backgroundColor: theme.colors.surface, borderRadius: '12px', border: `1px solid ${theme.colors.border}`
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            backgroundColor: theme.colors.primary.main,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Timer size={24} color="white" />
-          </div>
-          <div>
-            <h3 style={{ margin: 0, color: theme.colors.text.primary }}>Quickplay Mode</h3>
-            <p style={{ margin: '0.25rem 0 0 0', color: theme.colors.text.secondary, fontSize: '0.9rem' }}>
-              Instant 1v1 matching • 90s turns • Rapid SOL rewards
-            </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '1rem', width: isMobile ? '100%' : 'auto' }}>
-          <div style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: theme.colors.surface,
-            borderRadius: '8px',
-            border: `1px solid ${theme.colors.border}`,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.9rem',
-            color: theme.colors.text.primary
-          }}>
-            <Users size={16} /> {waitingPlayers.length} Searching...
-          </div>
-
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ color: theme.colors.text.primary, margin: 0 }}>Open Challenges</h2>
           <button
-            onClick={() => publicKey ? status === 'searching' ? setShowQuickplayModal(true) : setShowQuickplayModal(true) : showToast('Connect wallet')}
+            onClick={() => setShowCreateModal(true)}
             style={{
-              padding: '0.8rem 2rem',
-              backgroundColor: status === 'searching' ? '#6c757d' : theme.colors.primary.main,
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              flex: isMobile ? 1 : 'none',
-              boxShadow: `0 4px 12px ${theme.colors.primary.main}44`
+              padding: '0.8rem 1.5rem', backgroundColor: theme.colors.primary.main, color: 'white',
+              border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold'
             }}
           >
-            {status === 'searching' ? 'Searching...' : 'Find Match'}
+            Create Challenge
           </button>
         </div>
+
+        {challenges.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: theme.colors.text.secondary }}>
+            No open challenges found. Create one to start playing!
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: isMobile ? '1' : 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+            {challenges.map(c => (
+              <div key={c.id} style={{
+                padding: '1.5rem', borderRadius: '12px', backgroundColor: theme.colors.background,
+                border: `1px solid ${theme.colors.border}`, display: 'flex', flexDirection: 'column', gap: '1rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: theme.colors.primary.main, fontWeight: 'bold' }}>{c.buyInSOL} SOL Match</span>
+                  <span style={{ color: theme.colors.text.secondary, fontSize: '0.8rem' }}>{c.creator.slice(0, 6)}...</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const isParticipant = publicKey && c.players.includes(publicKey.toString());
+                    if (isParticipant) {
+                      navigate(`/game/${c.id}`);
+                    } else {
+                      setAcceptingChallenge(c);
+                    }
+                  }}
+                  style={{
+                    padding: '0.8rem',
+                    backgroundColor: (publicKey && c.players.includes(publicKey.toString()))
+                      ? theme.colors.primary.main
+                      : theme.colors.success,
+                    color: 'white', border: 'none', borderRadius: '8px',
+                    cursor: 'pointer', fontWeight: 'bold'
+                  }}
+                >
+                  {(publicKey && c.players.includes(publicKey.toString()))
+                    ? (c.status === 'in_progress' ? 'Reveal / View' : 'Your Challenge')
+                    : 'Accept Challenge'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* GameList and NewGameModal removed */}
-      <QuickplayModal
-        isOpen={showQuickplayModal}
-        onClose={() => setShowQuickplayModal(false)}
-        entryFee={0.1}
-        status={status}
-        onJoin={handleJoinPool}
-        onLeave={handleLeavePool}
+      <CreateChallengeModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreateChallenge}
+      />
+
+      <AcceptChallengeModal
+        isOpen={!!acceptingChallenge}
+        onClose={() => setAcceptingChallenge(null)}
+        onAccept={handleAcceptChallenge}
+        challenge={acceptingChallenge}
       />
     </div>
   );

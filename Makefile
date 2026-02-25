@@ -19,14 +19,14 @@ help:
 	@echo "  make build             Build everything"
 	@echo "  make build-banyan      Build Great Banyan program"
 	@echo "  make build-rps         Build RPS program"
-	@echo "  make build-chess       Build Chess program (placeholder)"
+	@echo "  make build-chess       Build Chess program"
 	@echo "  make build-frontend    Build frontend for production"
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev               Start frontend dev server"
 	@echo "  make deploy-banyan     Deploy Great Banyan to Solana"
 	@echo "  make deploy-rps        Deploy RPS to Solana"
-	@echo "  make deploy-chess      Deploy Chess to Solana (placeholder)"
+	@echo "  make deploy-chess      Deploy Chess to Solana"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean             Clean all build artifacts"
@@ -57,9 +57,9 @@ build-banyan:
 	@echo "🦀 Building Great Banyan..."
 	@bash scripts/build-banyan.sh
 
-# Build Chess (placeholder)
 build-chess:
-	@echo "♟️  Chess program is currently frontend-only. Script placeholder added."
+	@echo "🦀 Building Chess program..."
+	@bash scripts/build-chess.sh
 
 # Build frontend for production
 build-frontend:
@@ -76,9 +76,10 @@ deploy-banyan:
 	@echo "🚀 Deploying Great Banyan..."
 	@bash scripts/deploy-banyan.sh
 
-# Deploy Chess (placeholder)
+# Deploy Chess
 deploy-chess:
-	@echo "♟️  Chess program is currently frontend-only. Script placeholder added."
+	@echo "🚀 Deploying Chess..."
+	@bash scripts/deploy-chess.sh
 
 # Run RPS tests
 test-rps:
@@ -89,6 +90,10 @@ test-rps:
 test-banyan:
 	@echo "🦀 Running Great Banyan tests..."
 	@cd programs/great_banyan && cargo test
+# Run Chess tests
+test-chess:
+	@echo "🦀 Running Chess tests..."
+	@cd programs/idiot_chess && cargo test
 
 # Start frontend dev server
 dev:
