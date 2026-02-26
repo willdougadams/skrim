@@ -29,9 +29,11 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   });
 
   const setNetwork = (newNetwork: Network) => {
+    console.log(`[NetworkContext] Switching network from ${network} to ${newNetwork}`);
     setNetworkState(newNetwork);
     localStorage.setItem('solana-network', newNetwork);
     // Reload the page to ensure clean state with new network
+    console.log('[NetworkContext] Reloading page to apply changes...');
     window.location.reload();
   };
 

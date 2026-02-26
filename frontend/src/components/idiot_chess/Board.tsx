@@ -20,7 +20,8 @@ import {
 interface BoardProps {
     engine: IdiotChessEngine;
     state: GameState;
-    onMove: () => void;
+    onMove: (from?: Position, to?: Position) => void;
+    disabled?: boolean;
 }
 
 // --- Draggable Wrapper ---
@@ -151,7 +152,7 @@ const DroppableSquare: React.FC<DroppableSquareProps> = ({ x, y, children, isBla
 };
 
 
-const Board: React.FC<BoardProps> = ({ engine, state, onMove }) => {
+const Board: React.FC<BoardProps> = ({ engine, state, onMove, disabled }) => {
     const [selectedPos, setSelectedPos] = useState<Position | null>(null);
     const [validMoves, setValidMoves] = useState<Position[]>([]);
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -175,11 +176,16 @@ const Board: React.FC<BoardProps> = ({ engine, state, onMove }) => {
     );
 
     const handleSquareClick = (x: number, y: number) => {
-        // If game over, ignore
-        if (state.winner) return;
+        // If game over or disabled, ignore
+        if (state.winner || disabled) return;
 
-        // Prevent user from interacting during computer's turn (Black)
-        if (state.turn === 'black') return;
+        // Prevent user from interacting during computer's turn (Black) in practice mode
+        // In live mode, 'disabled' will be true if it's not the user's turn
+        if (state.turn === 'black' && !disabled) {
+            // In practice mode we still let AI move, but we should block user
+            // Actually, if it's black's turn and not disabled, it's AI turn
+            return;
+        }
 
         const clickedPos = { x, y };
         const clickedPiece = engine.getPiece(clickedPos);
@@ -205,7 +211,7 @@ const Board: React.FC<BoardProps> = ({ engine, state, onMove }) => {
                 engine.move(selectedPos, clickedPos);
                 setSelectedPos(null);
                 setValidMoves([]);
-                onMove();
+                onMove(selectedPos, clickedPos);
             } else {
                 // If clicking invalid square (empty or enemy not in range), deselect
                 setSelectedPos(null);
@@ -215,6 +221,7 @@ const Board: React.FC<BoardProps> = ({ engine, state, onMove }) => {
     };
 
     const handleDragStart = (event: DragStartEvent) => {
+        if (disabled) return;
         const { active } = event;
         setActiveId(active.id as string);
         setActivePiece(active.data.current?.piece as PieceType);
@@ -240,6 +247,7 @@ const Board: React.FC<BoardProps> = ({ engine, state, onMove }) => {
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
+        if (disabled) return;
         const { active, over } = event;
         setActiveId(null);
         setActivePiece(null);
@@ -275,7 +283,7 @@ const Board: React.FC<BoardProps> = ({ engine, state, onMove }) => {
 
             if (isValid) {
                 engine.move(sourcePos, { x: targetX, y: targetY });
-                onMove();
+                onMove(sourcePos, { x: targetX, y: targetY });
             }
         }
     };

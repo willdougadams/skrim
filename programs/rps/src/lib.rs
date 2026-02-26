@@ -82,7 +82,6 @@ pub struct GameAccount {
 
 const OFFSET_CREATOR: usize = 0;
 const OFFSET_NAME: usize = 32;
-const OFFSET_DESCRIPTION: usize = 96; // 32 + 64
 const OFFSET_MAX_PLAYERS: usize = 352; // 32 + 64 + 256
 const OFFSET_CURRENT_PLAYERS: usize = 353;
 const OFFSET_STATE: usize = 354;
@@ -105,24 +104,12 @@ fn set_name(data: &mut [u8], name: &[u8]) {
     }
 }
 
-fn set_description(data: &mut [u8], description: &[u8]) {
-    let len = description.len().min(256);
-    data[OFFSET_DESCRIPTION..OFFSET_DESCRIPTION + len].copy_from_slice(&description[..len]);
-    if len < 256 {
-        data[OFFSET_DESCRIPTION + len..OFFSET_DESCRIPTION + 256].fill(0);
-    }
-}
-
 fn get_max_players(data: &[u8]) -> u8 {
     data[OFFSET_MAX_PLAYERS]
 }
 
 fn set_max_players(data: &mut [u8], value: u8) {
     data[OFFSET_MAX_PLAYERS] = value;
-}
-
-fn get_current_players(data: &[u8]) -> u8 {
-    data[OFFSET_CURRENT_PLAYERS]
 }
 
 fn set_current_players(data: &mut [u8], value: u8) {

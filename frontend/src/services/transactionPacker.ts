@@ -336,3 +336,165 @@ export class AccountSizeCalculator {
     return baseSize + playersSize;
   }
 }
+
+/**
+ * Transaction Packer for Skrim Idiot Chess Game
+ */
+export enum ChessInstructionType {
+  CreateChallenge = 0,
+  AcceptChallenge = 1,
+  MakeMove = 2,
+  ClaimPrize = 3,
+}
+
+export class ChessTransactionPacker {
+  static packCreateChallenge(buyInLamports: bigint, name: string = ''): Uint8Array {
+    const nameBytes = new TextEncoder().encode(name.slice(0, 64));
+    const data = new Uint8Array(10 + nameBytes.length);
+    const view = new DataView(data.buffer);
+
+    view.setUint8(0, ChessInstructionType.CreateChallenge);
+    view.setBigUint64(1, buyInLamports, true);
+    view.setUint8(9, nameBytes.length);
+    data.set(nameBytes, 10);
+
+    return data;
+  }
+
+  static packAcceptChallenge(): Uint8Array {
+    return new Uint8Array([ChessInstructionType.AcceptChallenge]);
+  }
+
+  static packMakeMove(fromX: number, fromY: number, toX: number, toY: number): Uint8Array {
+    return new Uint8Array([
+      ChessInstructionType.MakeMove,
+      fromX,
+      fromY,
+      toX,
+      toY
+    ]);
+  }
+
+  static packClaimPrize(): Uint8Array {
+    return new Uint8Array([ChessInstructionType.ClaimPrize]);
+  }
+}
+
+/**
+ * Game Account Deserializer for Idiot Chess
+ */
+export class ChessGameAccountDeserializer {
+  static deserialize(data: Uint8Array): any {
+    if (data.length < 256) {
+      return null;
+    }
+
+    const view = new DataView(data.buffer, data.byteOffset);
+    let offset = 0;
+
+    // creator: Pubkey (32)
+    const creatorBytes = new Uint8Array(data.buffer, data.byteOffset + offset, 32);
+    const creator = new PublicKey(creatorBytes).toString();
+    offset += 32;
+
+    // name: [u8; 64]
+    const nameBytes = new Uint8Array(data.buffer, data.byteOffset + offset, 64);
+    const name = new TextDecoder().decode(nameBytes).replace(/\0/g, '').trim();
+    offset += 64;
+
+    // last_action_timestamp: i64 (8)
+    const last_action_timestamp = view.getBigInt64(offset, true);
+    offset += 8;
+
+    // buy_in_lamports: u64 (8)
+    const buy_in_lamports = view.getBigUint64(offset, true);
+    offset += 8;
+
+    // prize_pool: u64 (8)
+    const prize_pool = view.getBigUint64(offset, true);
+    offset += 8;
+
+    // players: [PlayerData; 2] (2 * 40 = 80)
+    const players = [];
+    for (let i = 0; i < 2; i++) {
+      const playerOffset = offset + (i * 40);
+      const pubkeyBytes = new Uint8Array(data.buffer, data.byteOffset + playerOffset, 32);
+
+      const isEmptySlot = pubkeyBytes.every(byte => byte === 0);
+      if (!isEmptySlot) {
+        const pubkey = new PublicKey(pubkeyBytes).toString();
+        const eliminated = view.getUint8(playerOffset + 32);
+        players.push({
+          pubkey,
+          eliminated: eliminated !== 0
+        });
+      }
+    }
+    offset += 80;
+
+    // board: [[Piece; 5]; 5] (25 * 2 = 50)
+    const board: any[][] = [];
+    const piecesList: any[] = [];
+    for (let y = 0; y < 5; y++) {
+      const row = [];
+      for (let x = 0; x < 5; x++) {
+        const pieceOffset = offset + (y * 5 + x) * 2;
+        const pieceType = view.getUint8(pieceOffset);
+        const player = view.getUint8(pieceOffset + 1);
+
+        if (pieceType === 0) {
+          row.push(null);
+        } else {
+          const piece = {
+            type: pieceType === 1 ? 'king' : 'pawn',
+            player: player === 0 ? 'white' : 'black',
+            id: `onchain-${y}-${x}-${pieceType}-${player}`, // Synthetic ID for animation
+            x,
+            y,
+            pieceType,
+            playerValue: player
+          };
+          row.push(piece);
+          piecesList.push(piece);
+        }
+      }
+      board.push(row);
+    }
+    offset += 50;
+
+    // turn: Player (1)
+    const turnVal = view.getUint8(offset); offset += 1;
+    const turn = turnVal === 0 ? 'white' : 'black';
+
+    // winner: Winner (1)
+    const winnerVal = view.getUint8(offset); offset += 1;
+    const winnerMap = ['None', 'white', 'black', 'draw'];
+    const winner = winnerMap[winnerVal] === 'None' ? null : winnerMap[winnerVal];
+
+    // move_count: u8 (1)
+    const move_count = view.getUint8(offset); offset += 1;
+
+    const result = {
+      creator,
+      name,
+      description: '', // Match GameService expectation
+      last_action_timestamp: Number(last_action_timestamp),
+      buy_in_lamports,
+      buyIn: Number(buy_in_lamports), // Match IdiotChessPage usage
+      prize_pool,
+      players,
+      playerWhite: players[0]?.pubkey || '',
+      playerBlack: players[1]?.pubkey || '',
+      board,
+      pieces: piecesList, // Match IdiotChessPage expectation
+      turn: turnVal, // Keep numeric turn for page component
+      winner: winnerVal === 0 ? null : winnerVal, // Keep numeric winner for page component
+      moveCount: move_count, // camelCase for page
+      move_count,
+      state: winner ? 'Finished' : (players.length < 2 ? 'WaitingForPlayers' : 'InProgress')
+    };
+
+    console.log('[ChessDeserializer] Result:', result);
+    return result;
+  }
+}

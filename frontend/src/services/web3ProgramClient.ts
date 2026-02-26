@@ -7,7 +7,7 @@ import {
   Keypair
 } from '@solana/web3.js';
 import { getProgramId } from '../config/programIds';
-import { TransactionPacker as TransactionPacker, AccountSizeCalculator } from './transactionPacker';
+import { TransactionPacker, AccountSizeCalculator, ChessTransactionPacker } from './transactionPacker';
 
 export interface CreateChallengeParams {
   entryFee: number; // in SOL
@@ -26,12 +26,12 @@ export class Web3ProgramClient {
   private wallet: any;
   private programId: PublicKey;
 
-  constructor(connection: Connection, wallet: any) {
+  constructor(connection: Connection, wallet: any, program: 'rps' | 'chess' = 'rps') {
     this.connection = connection;
     this.wallet = wallet;
-    this.programId = getProgramId(); // Auto-detect network
+    this.programId = getProgramId(program); // Auto-detect network & specified program
 
-    console.log('Web3ProgramClient created with program ID:', this.programId.toString());
+    console.log(`[Web3ProgramClient] Initialized for ${program} on ${this.connection.rpcEndpoint} with ID: ${this.programId.toBase58()}`);
   }
 
   async createChallenge(params: CreateChallengeParams): Promise<GameCreationResult> {
@@ -109,6 +109,11 @@ export class Web3ProgramClient {
     }
   }
 
+  async joinRPSGame(gameId: string, moves: number[]): Promise<string> {
+    console.log(`[Web3ProgramClient] joinRPSGame called for ${gameId}`);
+    return this.acceptChallenge(gameId, moves);
+  }
+
   async acceptChallenge(gameId: string, moves: number[]): Promise<string> {
     if (!this.wallet.publicKey || !this.wallet.signTransaction) {
       throw new Error('Wallet not connected');
@@ -182,17 +187,13 @@ export class Web3ProgramClient {
   }
 
   async claimPrize(gameId: string): Promise<string> {
-    console.log('claimPrize called with gameId:', gameId);
-
     if (!this.wallet.publicKey || !this.wallet.signTransaction) {
       throw new Error('Wallet not connected');
     }
 
     const gameAccount = new PublicKey(gameId);
-    console.log('Game account:', gameAccount.toString());
 
     const instructionData = TransactionPacker.packClaimPrize();
-    console.log('Instruction data:', instructionData);
 
     const claimPrizeInstruction = new TransactionInstruction({
       keys: [
@@ -202,25 +203,16 @@ export class Web3ProgramClient {
       programId: this.programId,
       data: Buffer.from(instructionData),
     });
-    console.log('Claim prize instruction created');
 
     try {
       const transaction = new Transaction().add(claimPrizeInstruction);
-      console.log('Getting latest blockhash...');
       const { blockhash } = await this.connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = this.wallet.publicKey;
-      console.log('Transaction constructed, signing...');
 
       const signedTransaction = await this.wallet.signTransaction(transaction);
-      console.log('Transaction signed, sending...');
-
       const signature = await this.connection.sendRawTransaction(signedTransaction.serialize());
-      console.log('Transaction sent:', signature);
-      console.log('Confirming transaction...');
-
       await this.connection.confirmTransaction(signature, 'confirmed');
-      console.log('Transaction confirmed!');
 
       return signature;
     } catch (error) {
@@ -228,7 +220,6 @@ export class Web3ProgramClient {
       throw error;
     }
   }
-
 
   async getGameAccount(gameId: string) {
     try {
@@ -239,8 +230,6 @@ export class Web3ProgramClient {
         return null;
       }
 
-      // Parse the account data manually based on the GameAccount structure
-      // This would need to match your Rust struct layout
       return {
         data: accountInfo.data,
         owner: accountInfo.owner.toString(),
@@ -252,13 +241,176 @@ export class Web3ProgramClient {
       return null;
     }
   }
+
+  // --- Idiot Chess Methods ---
+
+  async createChessChallenge(params: { entryFee: number; gameName: string }): Promise<GameCreationResult> {
+    if (!this.wallet.publicKey || !this.wallet.signTransaction) {
+      throw new Error('Wallet not connected');
+    }
+
+    const chessProgramId = getProgramId('chess');
+    const gameKeypair = Keypair.generate();
+    const gameAccount = gameKeypair.publicKey;
+
+    const buyInLamports = BigInt(Math.floor(params.entryFee * 1_000_000_000));
+    const chessInstructionData = ChessTransactionPacker.packCreateChallenge(buyInLamports, params.gameName);
+
+    const gameSpace = 256;
+    const gameRent = await this.connection.getMinimumBalanceForRentExemption(gameSpace);
+
+    const instructions = [];
+
+    instructions.push(SystemProgram.createAccount({
+      fromPubkey: this.wallet.publicKey,
+      newAccountPubkey: gameAccount,
+      lamports: gameRent,
+      space: gameSpace,
+      programId: chessProgramId,
+    }));
+
+    instructions.push(SystemProgram.transfer({
+      fromPubkey: this.wallet.publicKey,
+      toPubkey: gameAccount,
+      lamports: Number(buyInLamports),
+    }));
+
+    instructions.push(new TransactionInstruction({
+      keys: [
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: false },
+        { pubkey: gameAccount, isSigner: false, isWritable: true },
+      ],
+      programId: chessProgramId,
+      data: Buffer.from(chessInstructionData),
+    }));
+
+    const transaction = new Transaction();
+    instructions.forEach(ix => transaction.add(ix));
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = this.wallet.publicKey;
+
+    const signedTransaction = await this.wallet.signTransaction(transaction);
+    signedTransaction.partialSign(gameKeypair);
+
+    const signature = await this.connection.sendRawTransaction(signedTransaction.serialize());
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    return {
+      gameId: gameAccount.toString(),
+      signature
+    };
+  }
+
+  async acceptChessChallenge(gameId: string): Promise<string> {
+    if (!this.wallet.publicKey || !this.wallet.signTransaction) {
+      throw new Error('Wallet not connected');
+    }
+
+    const chessProgramId = getProgramId('chess');
+    const gameAccount = new PublicKey(gameId);
+
+    const accountInfo = await this.connection.getAccountInfo(gameAccount);
+    if (!accountInfo) throw new Error('Game not found');
+
+    // buy_in_lamports is at offset 112 in Chess GameAccount
+    const buyInLamports = accountInfo.data.slice(112, 120).readBigUInt64LE(0);
+
+    const instructionData = ChessTransactionPacker.packAcceptChallenge();
+
+    const transaction = new Transaction();
+    transaction.add(SystemProgram.transfer({
+      fromPubkey: this.wallet.publicKey,
+      toPubkey: gameAccount,
+      lamports: Number(buyInLamports),
+    }));
+
+    transaction.add(new TransactionInstruction({
+      keys: [
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: false },
+        { pubkey: gameAccount, isSigner: false, isWritable: true },
+      ],
+      programId: chessProgramId,
+      data: Buffer.from(instructionData),
+    }));
+
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = this.wallet.publicKey;
+
+    const signedTransaction = await this.wallet.signTransaction(transaction);
+    const signature = await this.connection.sendRawTransaction(signedTransaction.serialize());
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    return signature;
+  }
+
+  async makeChessMove(gameId: string, fromX: number, fromY: number, toX: number, toY: number): Promise<string> {
+    if (!this.wallet.publicKey || !this.wallet.signTransaction) {
+      throw new Error('Wallet not connected');
+    }
+
+    const chessProgramId = getProgramId('chess');
+    const gameAccount = new PublicKey(gameId);
+    const instructionData = ChessTransactionPacker.packMakeMove(fromX, fromY, toX, toY);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: false },
+        { pubkey: gameAccount, isSigner: false, isWritable: true },
+      ],
+      programId: chessProgramId,
+      data: Buffer.from(instructionData),
+    });
+
+    const transaction = new Transaction().add(instruction);
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = this.wallet.publicKey;
+
+    const signedTransaction = await this.wallet.signTransaction(transaction);
+    const signature = await this.connection.sendRawTransaction(signedTransaction.serialize());
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    return signature;
+  }
+
+  async claimChessPrize(gameId: string): Promise<string> {
+    if (!this.wallet.publicKey || !this.wallet.signTransaction) {
+      throw new Error('Wallet not connected');
+    }
+
+    const chessProgramId = getProgramId('chess');
+    const gameAccount = new PublicKey(gameId);
+    const instructionData = ChessTransactionPacker.packClaimPrize();
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: gameAccount, isSigner: false, isWritable: true },
+      ],
+      programId: chessProgramId,
+      data: Buffer.from(instructionData),
+    });
+
+    const transaction = new Transaction().add(instruction);
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = this.wallet.publicKey;
+
+    const signedTransaction = await this.wallet.signTransaction(transaction);
+    const signature = await this.connection.sendRawTransaction(signedTransaction.serialize());
+    await this.connection.confirmTransaction(signature, 'confirmed');
+
+    return signature;
+  }
 }
 
 // Factory function
-export function createWeb3ProgramClient(connection: Connection, wallet: any): Web3ProgramClient {
+export function createWeb3ProgramClient(connection: Connection, wallet: any, program: 'rps' | 'chess' = 'rps'): Web3ProgramClient {
   if (!wallet.publicKey || !wallet.signTransaction) {
     throw new Error('Wallet must be connected and have signing capabilities');
   }
 
-  return new Web3ProgramClient(connection, wallet);
+  return new Web3ProgramClient(connection, wallet, program);
 }

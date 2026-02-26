@@ -70,6 +70,10 @@ export class IdiotChessEngine {
     return this.state;
   }
 
+  public forceSetState(newState: Partial<GameState>): void {
+    this.state = { ...this.state, ...newState };
+  }
+
   public getPiece(pos: Position): Piece | null {
     if (!this.isValidPos(pos)) return null;
     return this.state.board[pos.y][pos.x];

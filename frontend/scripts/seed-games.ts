@@ -14,7 +14,7 @@ import * as path from 'path';
 
 // We need to implement a simple wallet adapter interface for the CLI
 class CliWallet {
-  constructor(public keypair: Keypair) {}
+  constructor(public keypair: Keypair) { }
 
   get publicKey() {
     return this.keypair.publicKey;

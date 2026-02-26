@@ -19,6 +19,7 @@ interface MatchupPlayerProps {
   isUserInGame: boolean;
   gameState: GameState;
   onRefresh: () => void;
+  onJoin?: (slot: number) => void;
 }
 
 export function MatchupPlayer({
@@ -28,7 +29,8 @@ export function MatchupPlayer({
   gameId,
   isUserInGame,
   gameState,
-  onRefresh
+  onRefresh,
+  onJoin
 }: MatchupPlayerProps) {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -67,7 +69,14 @@ export function MatchupPlayer({
 
     try {
       const client = createWeb3ProgramClient(connection, wallet);
-      await client.joinGame(gameId, playerData.slot);
+      if (onJoin) {
+        onJoin(playerData.slot);
+        setIsJoining(false);
+        return;
+      }
+      // Fallback if no onJoin provided
+      const defaultMoves = [0, 1, 2, 0, 1]; // Rock, Paper, Scissors, Rock, Paper
+      await client.joinRPSGame(gameId, defaultMoves);
       updateToast(toastId, 'Successfully joined!', 'success');
       onRefresh();
     } catch (error) {

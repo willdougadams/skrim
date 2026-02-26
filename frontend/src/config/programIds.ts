@@ -1,7 +1,7 @@
 import { PublicKey } from '@solana/web3.js';
 import programIds from '../../../scripts/program-ids.json';
 
-type Network = 'localnet' | 'devnet' | 'mainnet-beta';
+export type Network = 'localnet' | 'devnet' | 'mainnet-beta';
 
 // Auto-detect network from localStorage or URL
 export function getCurrentNetwork(): Network {
@@ -15,7 +15,14 @@ export function getCurrentNetwork(): Network {
 
   // Fallback to hostname-based detection
   const hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.endsWith('.local')
+  ) {
     return 'localnet';
   }
 
@@ -27,9 +34,10 @@ export function getProgramId(program: 'banyan' | 'rps' | 'chess' = 'rps', networ
 
   // Map mainnet-beta to mainnet for the JSON lookup
   const jsonKey = targetNetwork === 'mainnet-beta' ? 'mainnet' : targetNetwork;
-  const netData = programIds[jsonKey as keyof typeof programIds];
+  const netData = (programIds as any)[jsonKey];
 
   if (!netData) {
+    console.error(`[getProgramId] No configuration found for network: ${targetNetwork}`);
     throw new Error(`No configuration found for network: ${targetNetwork}`);
   }
 
@@ -37,8 +45,13 @@ export function getProgramId(program: 'banyan' | 'rps' | 'chess' = 'rps', networ
   const programId = typeof netData === 'string' ? netData : (netData as any)[program];
 
   if (!programId || programId === "11111111111111111111111111111111") {
-    throw new Error(`No program ID configured for network: ${targetNetwork}`);
+    console.warn(`[getProgramId] No program ID configured for ${program} on ${targetNetwork}`);
+    if (targetNetwork === 'localnet') {
+      throw new Error(`Program ${program} not found on localnet. Did you run 'make deploy-${program}'?`);
+    }
+    throw new Error(`No program ID configured for ${program} on ${targetNetwork}`);
   }
 
+  console.log(`[getProgramId] Using ${program} ID on ${targetNetwork}: ${programId}`);
   return new PublicKey(programId);
 }

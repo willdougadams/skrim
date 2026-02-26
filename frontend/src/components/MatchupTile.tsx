@@ -9,6 +9,7 @@ interface MatchupTileProps {
   isUserInGame: boolean;
   onMatchupClick: () => void;
   onRefresh: () => void;
+  onJoin?: (slot: number) => void;
 }
 
 export function MatchupTile({
@@ -16,7 +17,8 @@ export function MatchupTile({
   currentUserPublicKey,
   isUserInGame,
   onMatchupClick,
-  onRefresh
+  onRefresh,
+  onJoin
 }: MatchupTileProps) {
   const { player1, player2, matchState, isCurrentUserInMatch, gameId, gameState } = matchup;
 
@@ -100,6 +102,7 @@ export function MatchupTile({
           isUserInGame={isUserInGame}
           gameState={gameState}
           onRefresh={onRefresh}
+          onJoin={onJoin}
         />
       </div>
 
@@ -124,6 +127,7 @@ export function MatchupTile({
           isUserInGame={isUserInGame}
           gameState={gameState}
           onRefresh={onRefresh}
+          onJoin={onJoin}
         />
       </div>
     </div>

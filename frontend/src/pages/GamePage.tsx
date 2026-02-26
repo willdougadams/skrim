@@ -207,7 +207,7 @@ export default function GamePage() {
     );
     // moves_revealed is now [move_index]
     return userPlayer && userPlayer.moves_revealed &&
-      userPlayer.moves_revealed.some((m: any) => m !== 0);
+      userPlayer.moves_revealed.some((m: any) => m !== null);
   };
 
   const hasOpponentSubmittedMoves = () => {
@@ -237,7 +237,33 @@ export default function GamePage() {
   };
 
   // Action handlers
-  // handleSubmitMoves removed - moves are submitted in Lobby
+  const handleSubmitMoves = async () => {
+    if (!publicKey || !gameId || selectedMoves.length !== 5) {
+      showToast('Please select all moves', 'error');
+      return;
+    }
+
+    const toastId = showToast('Joining and submitting moves...', 'loading');
+    try {
+      const programClient = createWeb3ProgramClient(connection, wallet);
+      // Convert moves to numbers
+      const moveNumbers = selectedMoves.map(move => {
+        switch (move) {
+          case 'rock': return 0;
+          case 'paper': return 1;
+          case 'scissors': return 2;
+          default: return 0;
+        }
+      });
+
+      await programClient.joinRPSGame(gameId, moveNumbers);
+      updateToast(toastId, 'Successfully joined match!', 'success');
+      await fetchGameData();
+    } catch (error: any) {
+      console.error('Error joining match:', error);
+      updateToast(toastId, error.message || 'Failed to join match', 'error');
+    }
+  };
 
   const handleRevealMoves = async () => {
     if (!publicKey || !gameId || selectedMoves.length !== 5 || !moveSalt) {
@@ -266,6 +292,19 @@ export default function GamePage() {
       console.error('Error revealing moves:', error);
       updateToast(toastId, 'Failed to reveal moves - please try again', 'error');
     }
+  };
+
+  const handleJoinMatch = async (slot: number) => {
+    if (!publicKey) {
+      showToast('Please connect your wallet', 'error');
+      return;
+    }
+    // Only slot 2 (index 1) can be joined via RPS join flow
+    if (slot !== 1) {
+      showToast('You can only join slot 2', 'error');
+      return;
+    }
+    setShowMoveModal(true);
   };
 
   const handleClaimPrize = async () => {
@@ -432,6 +471,7 @@ export default function GamePage() {
         currentUserPublicKey={publicKey?.toString() || null}
         onMatchupClick={() => setShowMoveModal(true)}
         onRefresh={fetchGameData}
+        onJoin={handleJoinMatch}
         isUserInGame={isUserInGame()}
         onClaimPrize={handleClaimPrize}
         gameAccountBalance={gameAccountBalance}
@@ -442,13 +482,13 @@ export default function GamePage() {
         isOpen={showMoveModal}
         onClose={() => setShowMoveModal(false)}
         gameState={gameData.state}
-        hasUserSubmittedMoves={true} // In this model, if you are in game, moves are submitted
+        hasUserSubmittedMoves={hasUserSubmittedMoves()}
         hasUserRevealedMoves={hasUserRevealedMoves()}
-        hasOpponentSubmittedMoves={true} // Both must be joined for InProgress
+        hasOpponentSubmittedMoves={hasOpponentSubmittedMoves()}
         selectedMoves={selectedMoves}
         moveSalt={moveSalt}
         onMoveSelect={handleMoveSelect}
-        onSubmitMoves={() => { }} // Disabled
+        onSubmitMoves={handleSubmitMoves}
         onRevealMoves={handleRevealMoves}
       />
     </div>

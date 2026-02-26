@@ -114,9 +114,9 @@ export default function LandingPage() {
         />
         <GameCard
           title="Idiot Chess"
-          description="A chaotic and hilarious twist on the classic game of chess. Expect the unexpected in every move."
+          description="Chaotic 5x5 chess on Solana. Play for SOL prizes in live on-chain matches or practice against our local AI."
           icon={<Grip size={24} />}
-          path="/idiot-chess"
+          path="/idiot-chess-lobby"
           color={theme.colors.secondary.main}
         />
         <GameCard

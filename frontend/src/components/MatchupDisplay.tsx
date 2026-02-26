@@ -20,6 +20,7 @@ interface MatchupDisplayProps {
     onRefresh: () => void;
     isUserInGame: boolean;
     onClaimPrize: () => void;
+    onJoin?: (slot: number) => void;
     gameAccountBalance?: number;
 }
 
@@ -30,6 +31,7 @@ export function MatchupDisplay({
     onMatchupClick,
     onRefresh,
     isUserInGame,
+    onJoin,
     onClaimPrize,
     gameAccountBalance
 }: MatchupDisplayProps) {
@@ -77,8 +79,8 @@ export function MatchupDisplay({
         const player = rawGameData.players.find((p: any) =>
             (p.pubkey || p.toString()) === playerPubkey
         );
-        // Correct check: moves_revealed is [u8; 5], non-zero means revealed
-        return !!(player && player.moves_revealed && player.moves_revealed.some((m: any) => m !== 0));
+        // Correct check: moves_revealed is [u8; 5], non-null means revealed
+        return !!(player && player.moves_revealed && player.moves_revealed.some((m: any) => m !== null));
     };
 
     const findPlayerBySlot = (slot: number): Player | undefined => {
@@ -163,6 +165,7 @@ export function MatchupDisplay({
                     isUserInGame={isUserInGame}
                     onMatchupClick={onMatchupClick}
                     onRefresh={onRefresh}
+                    onJoin={onJoin}
                 />
             </div>
 
