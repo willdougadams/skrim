@@ -28,3 +28,5 @@ if (require.main === module) {
         console.log(`Trustful API listening at http://localhost:${port}`);
     });
 }
+
+export default app;
