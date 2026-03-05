@@ -15,13 +15,18 @@ const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-app.use('/lobby', lobbyRoutes);
-app.use('/banyan', banyanRoutes);
-app.use('/game', gameRoutes);
+const router = express.Router();
 
-app.get('/health', (req, res) => {
+router.use('/lobby', lobbyRoutes);
+router.use('/banyan', banyanRoutes);
+router.use('/game', gameRoutes);
+
+router.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
+
+app.use('/api', router);
+app.use('/', router);
 
 if (require.main === module) {
     app.listen(port, () => {
