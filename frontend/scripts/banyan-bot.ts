@@ -14,8 +14,9 @@ interface GameManagerAccount {
     authority: PublicKey;
     lastFruitBud: PublicKey;
     lastFruitPrize: bigint;
-    lastFruitDepth: number;
+    lastFruitTotalPrize: bigint;
     lastFruitEpoch: bigint;
+    lastFruitDepth: number;
 }
 
 interface TreeAccount {
@@ -131,8 +132,9 @@ async function main() {
             authority: new PublicKey(info.data.subarray(16, 16 + 32)),
             lastFruitBud: new PublicKey(info.data.subarray(48, 48 + 32)),
             lastFruitPrize: view.getBigUint64(80, true),
-            lastFruitEpoch: view.getBigUint64(88, true),
-            lastFruitDepth: view.getUint8(96),
+            lastFruitTotalPrize: view.getBigUint64(88, true),
+            lastFruitEpoch: view.getBigUint64(96, true),
+            lastFruitDepth: info.data[104],
         };
         // Note: Verify offset based on Rust struct
     }
@@ -351,42 +353,39 @@ async function main() {
         }
     }
 
-    async function actionDistributeNodeReward(bud: BudAccount) {
-        console.log(`💰 Distributing rewards for node ${bud.address.toString().slice(0, 8)}...`);
+    async function actionDistributeBatchReward(buds: BudAccount[]) {
+        if (buds.length === 0) return;
+        console.log(`💰 Batch Distributing rewards for ${buds.length} nodes...`);
 
         const [managerPda] = findGameManagerPda();
-        await connection.getAccountInfo(managerPda).then(i => {
-            if (!i) throw new Error("Manager not found");
-        });
-
-        // Collect all contributor accounts in order
         const keys = [
             { pubkey: payer.publicKey, isSigner: true, isWritable: true },
             { pubkey: managerPda, isSigner: false, isWritable: true },
-            { pubkey: bud.address, isSigner: false, isWritable: true },
         ];
 
-        // Add contributors
-        for (const [pk, _] of bud.contributions) {
-            keys.push({ pubkey: pk, isSigner: false, isWritable: true });
+        // For each bud, we need: the bud account itself, and all its contributor accounts
+        for (const bud of buds) {
+            keys.push({ pubkey: bud.address, isSigner: false, isWritable: true });
+            for (const [pk, _] of bud.contributions) {
+                keys.push({ pubkey: pk, isSigner: false, isWritable: true });
+            }
         }
 
-        // Add nurturer (cranker) as the last account to receive bounty
-        keys.push({ pubkey: payer.publicKey, isSigner: false, isWritable: true });
-
-        const instructionData = Buffer.from([3]); // DistributeNodeReward
+        const data = Buffer.alloc(2);
+        data.writeUInt8(4, 0); // DistributeBatchReward
+        data.writeUInt8(buds.length, 1);
 
         const tx = new Transaction().add({
             keys,
             programId: PROGRAM_ID,
-            data: instructionData
+            data
         });
 
         try {
             const sig = await sendAndConfirmTransaction(connection, tx, [payer], { skipPreflight: true });
-            console.log(`✅ Distributed! Sig: ${sig}`);
+            console.log(`✅ Batch Distributed! Sig: ${sig}`);
         } catch (e: any) {
-            console.error(`❌ Distribution failed for node ${bud.address.toString().slice(0, 8)}:`);
+            console.error(`❌ Batch Distribution failed:`);
             if (e.logs) {
                 console.error("Program Logs:", e.logs.join("\n"));
             } else if (e.message) {
@@ -420,26 +419,32 @@ async function main() {
             const [rootBud] = findBudPda(tree.address, 'root');
 
             // --- Reward Claiming (Previous Epochs) ---
-            // If we have a lastFruitBud, check if we (the payer) are in that branch and haven't claimed
             if (manager.lastFruitPrize > 0n && manager.lastFruitEpoch === manager.currentEpoch - BigInt(1)) {
                 console.log(`🔍 Checking for unclaimed rewards in epoch ${manager.lastFruitEpoch}...`);
 
-                // We need to find our contributions in the winning branch. 
-                // The bot would ideally have this cached, but for now we can scan 
-                // actionable/visible buds or specific ones if we know the path.
-                // Short-term: check the lastFruitBud itself and its ancestors.
-
                 let currentClaimAddr: PublicKey | null = manager.lastFruitBud;
+                const batchBuds: BudAccount[] = [];
+
                 while (currentClaimAddr && !currentClaimAddr.equals(PublicKey.default)) {
                     const bud = await fetchBud(currentClaimAddr);
                     if (!bud) break;
 
                     if (!bud.isPayoutComplete && bud.contributionCount > 0) {
-                        await actionDistributeNodeReward(bud);
+                        batchBuds.push(bud);
                     }
 
                     if (bud.parent.equals(PublicKey.default) || bud.depth === 0) break;
                     currentClaimAddr = bud.parent;
+                }
+
+                if (batchBuds.length > 0) {
+                    // Split into small batches to avoid account limits
+                    // Each node can have up to 10 contributors + the node itself.
+                    // Max accounts is usually 32. 2 nodes is safe (2 * 11 + 2 = 24).
+                    for (let i = 0; i < batchBuds.length; i += 2) {
+                        const chunk = batchBuds.slice(i, i + 2);
+                        await actionDistributeBatchReward(chunk);
+                    }
                 }
             }
 

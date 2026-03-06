@@ -24,28 +24,28 @@ const BanyanLogo: React.FC<BanyanLogoProps> = ({ size = 32, className, style }) 
                 <circle cx="0" cy="0" r="16" fill="currentColor" />
 
                 {/* Branches to Level 1 */}
-                <path d="M 0,0 L -100,-120" stroke="currentColor" strokeWidth="20" strokeLinecap="round" />
-                <path d="M 0,0 L 100,-120" stroke="currentColor" strokeWidth="20" strokeLinecap="round" />
+                <path d="M 0,0 L -100,-140" stroke="currentColor" strokeWidth="30" strokeLinecap="round" />
+                <path d="M 0,0 L 100,-140" stroke="currentColor" strokeWidth="30" strokeLinecap="round" />
 
                 {/* Level 1: 2 Middle Nodes */}
-                <g transform="translate(-100, -120)">
+                <g transform="translate(-100, -140)">
                     <circle cx="0" cy="0" r="14" fill="currentColor" />
                     {/* Branches to Level 2 */}
-                    <path d="M 0,0 L -60,-100" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
-                    <path d="M 0,0 L 60,-100" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
+                    <path d="M 0,0 L -60,-160" stroke="currentColor" strokeWidth="24" strokeLinecap="round" />
+                    <path d="M 0,0 L 60,-160" stroke="currentColor" strokeWidth="24" strokeLinecap="round" />
                     {/* Level 2: 2 Leaf Nodes */}
-                    <circle cx="-60" cy="-100" r="12" fill="currentColor" />
-                    <circle cx="60" cy="-100" r="12" fill="currentColor" />
+                    <circle cx="-60" cy="-160" r="12" fill="currentColor" />
+                    <circle cx="60" cy="-160" r="12" fill="currentColor" />
                 </g>
 
-                <g transform="translate(100, -120)">
+                <g transform="translate(100, -140)">
                     <circle cx="0" cy="0" r="14" fill="currentColor" />
                     {/* Branches to Level 2 */}
-                    <path d="M 0,0 L -60,-100" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
-                    <path d="M 0,0 L 60,-100" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
+                    <path d="M 0,0 L -60,-160" stroke="currentColor" strokeWidth="24" strokeLinecap="round" />
+                    <path d="M 0,0 L 60,-160" stroke="currentColor" strokeWidth="24" strokeLinecap="round" />
                     {/* Level 2: 2 Leaf Nodes */}
-                    <circle cx="-60" cy="-100" r="12" fill="currentColor" />
-                    <circle cx="60" cy="-100" r="12" fill="currentColor" />
+                    <circle cx="-60" cy="-160" r="12" fill="currentColor" />
+                    <circle cx="60" cy="-160" r="12" fill="currentColor" />
                 </g>
             </g>
         </svg>

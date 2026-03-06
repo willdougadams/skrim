@@ -57,13 +57,13 @@
                 "title": "Fully On-Chain",
                 "description": "All game logic and state is on-chain.  Secrets (like your RPS moves) are stored as a hash and revealed by proving the hash later.  Don't delete your cookies mid-game, they're holding onto your moves and salt"
             },
-            "fair_play": {
-                "title": "Fair Play",
-                "description": "Provably fair gaming using commit-reveal schemes and decentralized randomness."
+            "trustlessness": {
+                "title": "Trustlessness",
+                "description": "Skrim will quickly hit rate limits for public RPCs.  If you want pure trustlessness, you can use a custom RPC url in the settings.  \"Trustful Mode\" is enabled by default, which fetches on-chain data through Skrim's API.  You can trust me, but if you don't want to, you can just turn off trustful mode!"
             },
             "payouts": {
-                "title": "Instant Payouts",
-                "description": "Prizes are distributed automatically to winners via the blockchain."
+                "title": "Community is an Activity",
+                "description": "As the tendrils of the banyan intertwine to support one another, so shall the scrimmages of individual conflict support each of us in turn. One percent of each 1v1 prize pool is given as tribute to The Great Banyan.  Those who nurture the banyan may be lucky enough to find its fruit."
             }
         },
         "play_now": "Play Now",

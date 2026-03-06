@@ -127,6 +127,7 @@ pub fn process_instruction(
         return Err(ProgramError::InvalidInstructionData);
     }
 
+    msg!("Chess: process_instruction. Data len: {}", instruction_data.len());
     match instruction_data[0] {
         0 => {
             // CreateChallenge: [0] disc, [1..9] buy_in, [9] name_len, [10..] name
@@ -259,6 +260,7 @@ fn make_move(
     to_x: u8,
     to_y: u8,
 ) -> ProgramResult {
+    msg!("Chess: make_move from ({}, {}) to ({}, {})", from_x, from_y, to_x, to_y);
     let [player, game_account] = accounts.get(..2).ok_or(ProgramError::NotEnoughAccountKeys)? else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
@@ -281,7 +283,9 @@ fn make_move(
 
     // Identify current player index
     let player_idx = if game.turn == Player::White { 0 } else { 1 };
+    msg!("Chess: game.turn={:?}, idx={}, signer={:?}", game.turn, player_idx, player.key());
     if game.players[player_idx].pubkey != *player.key() {
+        msg!("Chess: Signer mismatch! Expected={:?}, Got={:?}", game.players[player_idx].pubkey, player.key());
         return Err(ProgramError::InvalidInstructionData);
     }
 
@@ -297,7 +301,9 @@ fn make_move(
     let t_y = to_y as usize;
 
     let piece = game.board[f_y][f_x];
+    msg!("Chess: from_piece={:?}, player={:?}", piece.piece_type, piece.player);
     if piece.piece_type == PieceType::None || piece.player != game.turn {
+        msg!("Chess: Invalid piece or not your turn! piece.player={:?}, game.turn={:?}", piece.player, game.turn);
         return Err(ProgramError::InvalidInstructionData);
     }
 

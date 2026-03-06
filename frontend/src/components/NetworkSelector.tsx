@@ -76,14 +76,14 @@ const NetworkSelector: React.FC = () => {
 
       {network === 'custom' && (
         <div style={{ marginTop: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <input
               type="text"
               placeholder="Custom RPC URL"
               value={customRpcUrl}
               onChange={(e) => setCustomRpcUrl(e.target.value)}
               style={{
-                flex: 1,
+                width: '100%',
                 padding: '0.4rem 0.5rem',
                 fontSize: '0.75rem',
                 backgroundColor: theme.colors.background,
@@ -96,6 +96,7 @@ const NetworkSelector: React.FC = () => {
             <button
               onClick={() => applyCustomRpc()}
               style={{
+                width: '100%',
                 padding: '0.4rem 0.75rem',
                 fontSize: '0.7rem',
                 fontWeight: 600,

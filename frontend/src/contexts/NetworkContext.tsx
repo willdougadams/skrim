@@ -45,7 +45,8 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   });
 
   const [trustfulMode, setTrustfulModeState] = useState<boolean>(() => {
-    return localStorage.getItem('solana-trustful-mode') === 'true';
+    const stored = localStorage.getItem('solana-trustful-mode');
+    return stored === null ? true : stored === 'true';
   });
 
   const rpcUrl = useMemo(() => {

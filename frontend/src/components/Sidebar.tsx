@@ -229,7 +229,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobile = false }) => {
                                     <strong>{balance !== null ? balance.toFixed(2) : '...'} SOL</strong>
                                 </div>
                             )}
-                            <NetworkSelector />
 
                             {/* Trustful Mode Toggle */}
                             <div style={{
@@ -270,6 +269,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobile = false }) => {
                                     }} />
                                 </button>
                             </div>
+
+                            {!trustfulMode && <NetworkSelector />}
 
                             <AirdropButton />
 

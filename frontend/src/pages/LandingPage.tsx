@@ -89,16 +89,42 @@ export default function LandingPage() {
           alignItems: 'center',
           justifyContent: 'center',
           gap: '1.5rem',
-          marginBottom: '2rem',
+          marginBottom: '1rem',
           color: theme.colors.text.primary
         }}>
-          <BanyanLogo size={80} />
+          <BanyanLogo size={110} />
           <span style={{
             fontSize: '5rem',
             fontWeight: '900',
             letterSpacing: '-0.05em',
             lineHeight: 1
           }}>SKRIM</span>
+        </div>
+      </div>
+      <div style={{
+        borderRadius: '16px',
+        padding: '2rem',
+        border: `1px solid ${theme.colors.border}`,
+        textAlign: 'center'
+      }}>
+        <h2 style={{ color: theme.colors.text.primary, marginBottom: '1.5rem' }}>{t('landing.why_skrim.title')}</h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '2rem'
+        }}>
+          <div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: theme.colors.primary.main, marginBottom: '0.5rem' }}>{t('landing.why_skrim.payouts.title')}</div>
+            <p style={{ color: theme.colors.text.secondary, margin: 0, fontSize: '0.9rem' }}>{t('landing.why_skrim.payouts.description')}</p>
+          </div>
+          <div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: theme.colors.primary.main, marginBottom: '0.5rem' }}>{t('landing.why_skrim.trustlessness.title')}</div>
+            <p style={{ color: theme.colors.text.secondary, margin: 0, fontSize: '0.9rem' }}>{t('landing.why_skrim.trustlessness.description')}</p>
+          </div>
+          <div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: theme.colors.primary.main, marginBottom: '0.5rem' }}>{t('landing.why_skrim.on_chain.title')}</div>
+            <p style={{ color: theme.colors.text.secondary, margin: 0, fontSize: '0.9rem' }}>{t('landing.why_skrim.on_chain.description')}</p>
+          </div>
         </div>
       </div>
 
@@ -129,35 +155,6 @@ export default function LandingPage() {
           path="/great-banyan"
           color="#10b981"
         />
-      </div>
-
-      {/* Stats/Info Section */}
-      <div style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: '16px',
-        padding: '2rem',
-        border: `1px solid ${theme.colors.border}`,
-        textAlign: 'center'
-      }}>
-        <h2 style={{ color: theme.colors.text.primary, marginBottom: '1.5rem' }}>{t('landing.why_skrim.title')}</h2>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '2rem'
-        }}>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: theme.colors.primary.main, marginBottom: '0.5rem' }}>{t('landing.why_skrim.on_chain.title')}</div>
-            <p style={{ color: theme.colors.text.secondary, margin: 0, fontSize: '0.9rem' }}>{t('landing.why_skrim.on_chain.description')}</p>
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: theme.colors.primary.main, marginBottom: '0.5rem' }}>{t('landing.why_skrim.fair_play.title')}</div>
-            <p style={{ color: theme.colors.text.secondary, margin: 0, fontSize: '0.9rem' }}>{t('landing.why_skrim.fair_play.description')}</p>
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: theme.colors.primary.main, marginBottom: '0.5rem' }}>{t('landing.why_skrim.payouts.title')}</div>
-            <p style={{ color: theme.colors.text.secondary, margin: 0, fontSize: '0.9rem' }}>{t('landing.why_skrim.payouts.description')}</p>
-          </div>
-        </div>
       </div>
     </div>
   );
