@@ -6,9 +6,9 @@ import {
   TransactionInstruction
 } from '@solana/web3.js';
 import { getProgramId } from '../config/programIds';
-import { TransactionPacker, AccountSizeCalculator, ChessTransactionPacker } from './transactionPacker';
+import { TransactionPacker, AccountSizeCalculator, ChessTransactionPacker } from '@throwdown/shared';
 
-export interface CreateChallengeParams {
+interface CreateChallengeParams {
   entryFee: number; // in SOL
   moves: number[];
   salt: bigint;
@@ -19,7 +19,7 @@ interface GameCreationResult {
   signature: string;
 }
 
-export class Web3ProgramClient {
+class Web3ProgramClient {
   private connection: Connection;
   private wallet: any;
   private programId: PublicKey;
@@ -196,15 +196,15 @@ export class Web3ProgramClient {
     return signature;
   }
 
-  async claimPrize(gameId: string): Promise<string> {
+  async distributePrize(gameId: string): Promise<string> {
     if (!this.wallet.publicKey || !this.wallet.signTransaction) {
       throw new Error('Wallet not connected');
     }
 
     const gameAccount = new PublicKey(gameId);
-    const instructionData = TransactionPacker.packClaimPrize();
+    const instructionData = TransactionPacker.packdistributePrize();
 
-    const claimPrizeInstruction = new TransactionInstruction({
+    const distributePrizeInstruction = new TransactionInstruction({
       keys: [
         { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
         { pubkey: gameAccount, isSigner: false, isWritable: true },
@@ -215,7 +215,7 @@ export class Web3ProgramClient {
     });
 
     try {
-      const transaction = new Transaction().add(claimPrizeInstruction);
+      const transaction = new Transaction().add(distributePrizeInstruction);
       const { blockhash } = await this.connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = this.wallet.publicKey;
@@ -226,7 +226,7 @@ export class Web3ProgramClient {
 
       return signature;
     } catch (error) {
-      console.error('Error in claimPrize:', error);
+      console.error('Error in distributePrize:', error);
       throw error;
     }
   }
@@ -255,7 +255,7 @@ export class Web3ProgramClient {
   private getTreasuryPDA(): PublicKey {
     const banyanProgramId = getProgramId('banyan');
     const [pda] = PublicKey.findProgramAddressSync(
-      [Buffer.from('manager')],
+      [Buffer.from('manager_v4')],
       banyanProgramId
     );
     return pda;
@@ -306,7 +306,7 @@ export class Web3ProgramClient {
     transaction.add(
       new TransactionInstruction({
         keys: [
-          { pubkey: this.wallet.publicKey, isSigner: true, isWritable: false },
+          { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
           { pubkey: gameAccount, isSigner: false, isWritable: true },
         ],
         programId: chessProgramId,
@@ -420,14 +420,14 @@ export class Web3ProgramClient {
     return signature;
   }
 
-  async claimChessPrize(gameId: string): Promise<string> {
+  async distributeChessPrize(gameId: string): Promise<string> {
     if (!this.wallet.publicKey || !this.wallet.signTransaction) {
       throw new Error('Wallet not connected');
     }
 
     const chessProgramId = getProgramId('chess');
     const gameAccount = new PublicKey(gameId);
-    const instructionData = ChessTransactionPacker.packClaimPrize();
+    const instructionData = ChessTransactionPacker.packdistributePrize();
 
     const instruction = new TransactionInstruction({
       keys: [
@@ -459,3 +459,5 @@ export function createWeb3ProgramClient(connection: Connection, wallet: any, pro
 
   return new Web3ProgramClient(connection, wallet, program);
 }
+
+

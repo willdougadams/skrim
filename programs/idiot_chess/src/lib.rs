@@ -151,7 +151,7 @@ pub fn process_instruction(
                 instruction_data[4],
             )
         }
-        3 => claim_prize(_program_id, accounts),
+        3 => distribute_prize(_program_id, accounts),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -165,14 +165,18 @@ fn create_challenge(
     accounts: &[AccountInfo],
     buy_in_lamports: u64,
 ) -> ProgramResult {
-    let [creator, game_account] = accounts.get(..2).ok_or(ProgramError::NotEnoughAccountKeys)? else {
-        return Err(ProgramError::NotEnoughAccountKeys);
+    msg!("create_challenge: starting. accounts.len={}", accounts.len());
+    let [creator, game_account] = accounts.get(..2).ok_or(ProgramError::Custom(99))? else {
+        msg!("create_challenge: failed to get accounts");
+        return Err(ProgramError::Custom(99));
     };
-
+    
+    msg!("create_challenge: checking signer");
     if !creator.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
 
+    msg!("create_challenge: checking owner");
     // Check owner
     if *game_account.owner() != *program_id {
         return Err(ProgramError::InvalidAccountData);
@@ -265,6 +269,14 @@ fn make_move(
 
     // Check owner
     if *game_account.owner() != *program_id {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    // Validate Treasury PDA
+    let manager_acc = accounts.get(4).ok_or(ProgramError::NotEnoughAccountKeys)?;
+    const EXPECTED_TREASURY: &[u8; 32] = include_bytes!("treasury.bin");
+    if manager_acc.key().as_ref() != EXPECTED_TREASURY.as_ref() {
+        msg!("Invalid treasury PDA");
         return Err(ProgramError::InvalidAccountData);
     }
 
@@ -504,7 +516,7 @@ fn check_win_condition(game: &mut GameAccount) {
     }
 }
 
-pub fn claim_prize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+pub fn distribute_prize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
     let [winner_acc, game_account, manager_acc] = accounts.get(..3).ok_or(ProgramError::NotEnoughAccountKeys)? else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
@@ -518,11 +530,19 @@ pub fn claim_prize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResu
     // We get the program_id from the first account's owner if it's a program-owned account normally,
     // but in Pinocchio we usually just check against a known ID or the entry point's program_id.
     // For simplicity, we just check that the game_account is owned by THIS program.
-    // However, the process_instruction doesn't pass program_id to claim_prize easily without refactor.
+    // However, the process_instruction doesn't pass program_id to distribute_prize easily without refactor.
     // Let's just assume for now, or check that it's NOT a system account.
     
-    if !winner_acc.is_signer() {
-        return Err(ProgramError::MissingRequiredSignature);
+    if winner_acc.is_signer() {
+        // We no longer require the winner to be a signer so anyone can crank this instruction
+        // But we leave this block empty just as a note, or we can remove the if block cleanly.
+    }
+
+    // Validate Treasury PDA
+    const EXPECTED_TREASURY: &[u8; 32] = include_bytes!("treasury.bin");
+    if manager_acc.key().as_ref() != EXPECTED_TREASURY.as_ref() {
+        msg!("Invalid treasury PDA");
+        return Err(ProgramError::InvalidAccountData);
     }
 
     let mut data = game_account.try_borrow_mut_data()?;
@@ -618,3 +638,4 @@ pub unsafe extern "C" fn sol_memcpy_(dst: *mut u8, src: *const u8, n: usize) {
 pub unsafe extern "C" fn sol_memmove_(dst: *mut u8, src: *const u8, n: usize) {
     std::ptr::copy(src, dst, n);
 }
+

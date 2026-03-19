@@ -6,7 +6,7 @@ export const PROGRAM_ID = getProgramId('banyan');
 
 export const findGameManagerPda = (): [PublicKey, number] => {
     return PublicKey.findProgramAddressSync(
-        [new TextEncoder().encode('manager_v2')],
+        [new TextEncoder().encode('manager_v4')],
         PROGRAM_ID
     );
 };
@@ -18,7 +18,7 @@ export const findTreePda = (epoch: bigint): [PublicKey, number] => {
     view.setBigUint64(0, epoch, true);
 
     return PublicKey.findProgramAddressSync(
-        [new TextEncoder().encode('tree'), epochBuffer],
+        [new TextEncoder().encode('tree_v4'), epochBuffer],
         PROGRAM_ID
     );
 };
@@ -51,30 +51,8 @@ export const findChildBudPda = (parentBud: PublicKey, direction: 'left' | 'right
     );
 }
 
-export interface BudAccount {
-    parent: PublicKey;
-    depth: number;
-    vitalityCurrent: bigint;
-    vitalityRequired: bigint;
-    isBloomed: boolean;
-    isFruit: boolean;
-    isPayoutComplete: boolean;
-    contributionCount: number;
-    contributions: [PublicKey, bigint][];
-}
 
-export interface TreeAccount {
-    fruitFrequency: number; // u64
-    authority: PublicKey;
-    vitalityRequiredBase: number;
-}
 
-export interface GameManagerAccount {
-    currentEpoch: bigint;
-    prizePool: bigint;
-    authority: PublicKey;
-    lastFruitBud: PublicKey;
-    lastFruitPrize: bigint;
-    lastFruitEpoch: bigint;
-    lastFruitDepth: number;
-}
+
+
+

@@ -4,12 +4,8 @@ import { Circle, FileText, Scissors, Lock, HelpCircle, Minus, Zap, Wind, Sparkle
 import { createWeb3ProgramClient } from '../services/web3ProgramClient';
 import { useToast } from '../contexts/ToastContext';
 import { WalletDisplay } from './WalletDisplay';
-import { MatchupPlayerData, MatchState, GameState } from '../types/game';
+import { MatchupPlayerData, MatchState, GameState, Move } from '../types/game';
 import { theme } from '../theme';
-
-const RockIcon = () => <Circle size={16} />;
-const PaperIcon = () => <FileText size={16} />;
-const ScissorsIcon = () => <Scissors size={16} />;
 
 interface MatchupPlayerProps {
   playerData: MatchupPlayerData;
@@ -130,13 +126,13 @@ export function MatchupPlayer({
   }
 
   // Render a single move icon
-  const renderMoveIcon = (move: 'rock' | 'paper' | 'scissors' | 'fury' | 'serenity' | 'trickery') => {
-    if (move === 'rock') return <RockIcon />;
-    if (move === 'paper') return <PaperIcon />;
-    if (move === 'scissors') return <ScissorsIcon />;
-    if (move === 'fury') return <Zap size={16} />;
-    if (move === 'serenity') return <Wind size={16} />;
-    if (move === 'trickery') return <Sparkles size={16} />;
+  const renderMoveIcon = (move: Move, size: number = 16) => {
+    if (move === 'rock') return <Circle size={size} />;
+    if (move === 'paper') return <FileText size={size} />;
+    if (move === 'scissors') return <Scissors size={size} />;
+    if (move === 'fury') return <Zap size={size} />;
+    if (move === 'serenity') return <Wind size={size} />;
+    if (move === 'trickery') return <Sparkles size={size} />;
     return null;
   };
 
@@ -146,10 +142,34 @@ export function MatchupPlayer({
     if (moves && moves.length > 0) {
       console.log('Rendering move icons:', moves, 'isCurrentUser:', isCurrentUser);
       return (
-        <div style={{ display: 'flex', gap: '4px', color: theme.colors.text.primary }}>
-          {moves.map((move, idx) => (
-            <span key={idx}>{renderMoveIcon(move)}</span>
-          ))}
+        <div style={{ display: 'flex', gap: '6px', color: theme.colors.text.primary }}>
+          {moves.map((move, idx) => {
+            const resolvedMove = playerData.resolvedMoves?.[idx];
+            const isStrategy = move === 'fury' || move === 'serenity' || move === 'trickery';
+            
+            return (
+              <div key={idx} style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: '24px',
+                minHeight: isStrategy ? '40px' : '24px',
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                padding: '4px',
+                borderRadius: '6px',
+                border: isStrategy ? `1px solid ${theme.colors.border}` : '1px solid transparent'
+              }}>
+                {renderMoveIcon(move, 16)}
+                {isStrategy && resolvedMove && (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '2px' }}>
+                    <div style={{ opacity: 0.5, fontSize: '10px', lineHeight: '10px' }}>↓</div>
+                    {renderMoveIcon(resolvedMove, 12)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       );
     }

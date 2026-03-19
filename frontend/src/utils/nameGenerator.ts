@@ -1,4 +1,4 @@
-export const ADVERBS = [
+const ADVERBS = [
   "anxiously", "bravely", "calmly", "daringly", "eagerly", "fiercely",
   "gladly", "hastily", "idly", "joyfully", "keenly", "lightly",
   "madly", "neatly", "openly", "proudly", "quietly", "rapidly",
@@ -6,7 +6,7 @@ export const ADVERBS = [
   "xenially", "yearningly", "zealously"
 ];
 
-export const VERBS = [
+const VERBS = [
   "acting", "baking", "cooking", "dancing", "eating", "flying",
   "gaming", "hacking", "itching", "jumping", "kicking", "laughing",
   "mining", "napping", "opening", "playing", "quitting", "running",
@@ -14,7 +14,7 @@ export const VERBS = [
   "xraying", "yelling", "zooming"
 ];
 
-export const NOUNS = [
+const NOUNS = [
   "ape", "bear", "cat", "dog", "eagle", "fox",
   "goat", "horse", "iguana", "jaguar", "kangaroo", "lion",
   "monkey", "newt", "owl", "panda", "quail", "rabbit",

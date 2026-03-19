@@ -20,7 +20,7 @@ interface MatchupDisplayProps {
     onMatchupClick: () => void;
     onRefresh: () => void;
     isUserInGame: boolean;
-    onClaimPrize: () => void;
+    ondistributePrize: () => void;
     onJoin?: (slot: number) => void;
     gameAccountBalance?: number;
 }
@@ -33,7 +33,7 @@ export function MatchupDisplay({
     onRefresh,
     isUserInGame,
     onJoin,
-    onClaimPrize,
+    ondistributePrize,
     gameAccountBalance
 }: MatchupDisplayProps) {
     const { t } = useTranslation();
@@ -55,8 +55,30 @@ export function MatchupDisplay({
             if (m === 0) return 'rock';
             if (m === 1) return 'paper';
             if (m === 2) return 'scissors';
+            if (m === 3) return 'fury';
+            if (m === 4) return 'serenity';
+            if (m === 5) return 'trickery';
             return 'rock';
         }) as Move[];
+    };
+
+    const resolveStrategy = (strategy: Move, prevSelfMove: Move, prevOpponentMove: Move): Move => {
+        if (strategy === 'fury') {
+            if (prevOpponentMove === 'rock') return 'paper';
+            if (prevOpponentMove === 'paper') return 'scissors';
+            if (prevOpponentMove === 'scissors') return 'rock';
+            return prevOpponentMove;
+        }
+        if (strategy === 'serenity') {
+            return prevSelfMove;
+        }
+        if (strategy === 'trickery') {
+            if (prevOpponentMove === 'rock') return 'scissors';
+            if (prevOpponentMove === 'paper') return 'rock';
+            if (prevOpponentMove === 'scissors') return 'paper';
+            return prevOpponentMove;
+        }
+        return strategy;
     };
 
     const hasPlayerSubmittedMoves = (playerPubkey: string): boolean => {
@@ -89,17 +111,16 @@ export function MatchupDisplay({
         return gameData.players.find(p => p.slot === slot);
     };
 
-    const buildPlayerData = (player: Player | undefined, slot: number): MatchupPlayerData => {
+    const buildPlayerData = (player: Player | undefined, slot: number, moves?: Move[], resolvedMoves?: Move[]): MatchupPlayerData => {
         if (!player) {
             return { player: undefined, moves: undefined, hasSubmitted: false, hasRevealed: false, isWinner: false, slot };
         }
 
-        const moves = getPlayerMoves(player.publicKey);
         const hasSubmitted = hasPlayerSubmittedMoves(player.publicKey);
         const hasRevealed = hasPlayerRevealedMoves(player.publicKey);
         const isWinner = gameData.winner?.publicKey === player.publicKey;
 
-        return { player, moves, hasSubmitted, hasRevealed, isWinner, slot: player.slot };
+        return { player, moves, resolvedMoves, hasSubmitted, hasRevealed, isWinner, slot: player.slot };
     };
 
     // 1v1 Matchup Logic
@@ -133,9 +154,37 @@ export function MatchupDisplay({
         player2?.publicKey === currentUserPublicKey
     ));
 
+    const player1Moves = player1 ? getPlayerMoves(player1.publicKey) : undefined;
+    const player2Moves = player2 ? getPlayerMoves(player2.publicKey) : undefined;
+
+    let p1ResolvedMoves: Move[] | undefined = undefined;
+    let p2ResolvedMoves: Move[] | undefined = undefined;
+
+    if (player1Moves && player2Moves && player1Moves.length === 5 && player2Moves.length === 5) {
+        p1ResolvedMoves = [];
+        p2ResolvedMoves = [];
+        
+        let p1PrevResolved: Move | undefined = undefined;
+        let p2PrevResolved: Move | undefined = undefined;
+
+        for (let i = 0; i < 5; i++) {
+            const m1 = player1Moves[i];
+            const m2 = player2Moves[i];
+
+            const m1Resolved: Move = i === 0 ? m1 : resolveStrategy(m1, p1PrevResolved!, p2PrevResolved!);
+            const m2Resolved: Move = i === 0 ? m2 : resolveStrategy(m2, p2PrevResolved!, p1PrevResolved!);
+
+            p1ResolvedMoves.push(m1Resolved);
+            p2ResolvedMoves.push(m2Resolved);
+
+            p1PrevResolved = m1Resolved;
+            p2PrevResolved = m2Resolved;
+        }
+    }
+
     const matchup: Matchup = {
-        player1: buildPlayerData(player1, 0),
-        player2: buildPlayerData(player2, 1),
+        player1: buildPlayerData(player1, 0, player1Moves, p1ResolvedMoves),
+        player2: buildPlayerData(player2, 1, player2Moves, p2ResolvedMoves),
         matchState,
         isCurrentUserInMatch,
         gameId: gameData.id,
@@ -228,7 +277,7 @@ export function MatchupDisplay({
                                 </div>
                             ) : (
                                 <button
-                                    onClick={onClaimPrize}
+                                    onClick={ondistributePrize}
                                     style={{
                                         padding: `${theme.spacing.md} ${theme.spacing.xl}`,
                                         backgroundColor: '#ffd700',
@@ -241,7 +290,7 @@ export function MatchupDisplay({
                                         width: '100%'
                                     }}
                                 >
-                                    {t('rps.game.claim_prize_sol', { amount: prizeAmountSOL.toFixed(4) })}
+                                    {t('rps.game.distribute_prize_sol', { amount: prizeAmountSOL.toFixed(4) })}
                                 </button>
                             )}
                         </div>
@@ -251,3 +300,4 @@ export function MatchupDisplay({
         </div>
     );
 }
+

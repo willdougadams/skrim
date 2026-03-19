@@ -99,12 +99,12 @@ async function main() {
 
     // --- Helpers ---
     const findGameManagerPda = () =>
-        PublicKey.findProgramAddressSync([Buffer.from("manager_v3")], PROGRAM_ID);
+        PublicKey.findProgramAddressSync([Buffer.from("manager_v4")], PROGRAM_ID);
 
     const findTreePda = (epoch: bigint) => {
         const epochBuf = Buffer.alloc(8);
         epochBuf.writeBigUInt64LE(epoch);
-        return PublicKey.findProgramAddressSync([Buffer.from("tree"), epochBuf], PROGRAM_ID);
+        return PublicKey.findProgramAddressSync([Buffer.from("tree_v4"), epochBuf], PROGRAM_ID);
     };
 
     const findBudPda = (treePda: PublicKey, p: string) =>
@@ -192,6 +192,8 @@ async function main() {
 
         const [treePda] = findTreePda(epoch);
         const [rootBudPda] = findBudPda(treePda, 'root');
+        const [leftPda] = findChildBudPda(rootBudPda, 'left');
+        const [rightPda] = findChildBudPda(rootBudPda, 'right');
         const [managerPda] = findGameManagerPda();
 
         const data = Buffer.alloc(1 + 8 + 8);
@@ -205,6 +207,8 @@ async function main() {
                 { pubkey: managerPda, isSigner: false, isWritable: true },
                 { pubkey: treePda, isSigner: false, isWritable: true },
                 { pubkey: rootBudPda, isSigner: false, isWritable: true },
+                { pubkey: leftPda, isSigner: false, isWritable: true },
+                { pubkey: rightPda, isSigner: false, isWritable: true },
                 { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
             ],
             programId: PROGRAM_ID,
@@ -310,6 +314,13 @@ async function main() {
         const [treePda] = findTreePda(epoch);
         const [leftPda] = findChildBudPda(bud.address, 'left');
         const [rightPda] = findChildBudPda(bud.address, 'right');
+        
+        // Prepare next epoch accounts for auto-initialization
+        const nextEpoch = epoch + 1n;
+        const [nextTreePda] = findTreePda(nextEpoch);
+        const [nextRootPda] = findBudPda(nextTreePda, 'root');
+        const [nextLeftPda] = findChildBudPda(nextRootPda, 'left');
+        const [nextRightPda] = findChildBudPda(nextRootPda, 'right');
 
         const tx = new Transaction().add({
             keys: [
@@ -321,6 +332,11 @@ async function main() {
                 { pubkey: treePda, isSigner: false, isWritable: false },
                 { pubkey: leftPda, isSigner: false, isWritable: true },
                 { pubkey: rightPda, isSigner: false, isWritable: true },
+                // Extra accounts for next-epoch auto-initialization (always passed)
+                { pubkey: nextTreePda, isSigner: false, isWritable: true },
+                { pubkey: nextRootPda, isSigner: false, isWritable: true },
+                { pubkey: nextLeftPda, isSigner: false, isWritable: true },
+                { pubkey: nextRightPda, isSigner: false, isWritable: true },
             ],
             programId: PROGRAM_ID,
             data
@@ -412,8 +428,13 @@ async function main() {
 
             const tree = await fetchTree(manager.currentEpoch);
             if (!tree) {
-                console.log(`🌱 Tree for epoch ${manager.currentEpoch} not found. Initializing...`);
-                await actionInitializeTree(manager.currentEpoch);
+                console.log(`🌱 Tree for epoch ${manager.currentEpoch} not found!`);
+                
+                // Fallback Initialization ONLY if the game got stuck or wasn't deployed
+                // Under normal circumstances, NurtureBud transitions the epoch and initializes automatically
+                if (manager.currentEpoch === 0n) {
+                    await actionInitializeTree(manager.currentEpoch);
+                }
                 await new Promise(r => setTimeout(r, 2000));
                 continue;
             }

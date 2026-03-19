@@ -15,6 +15,7 @@ export interface Player {
 export interface MatchupPlayerData {
   player?: Player;
   moves?: Move[]; // All 5 moves
+  resolvedMoves?: Move[]; // The resolved moves (after applying strategies)
   hasSubmitted: boolean;
   hasRevealed: boolean;
   isWinner: boolean;

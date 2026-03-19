@@ -1,7 +1,38 @@
 const { exec, rootPath } = require('./utils');
+const fs = require('fs');
+const path = require('path');
+
+function generateTreasuries(network) {
+    try {
+        const { PublicKey } = require(path.join(rootPath(), 'frontend/node_modules/@solana/web3.js'));
+        const programIds = require('./program-ids.json');
+        
+        const banyanIdStr = programIds[network]?.banyan;
+        if (!banyanIdStr) {
+            console.log(`⚠️ No Banyan program ID found for network ${network}, skipping treasury generation.`);
+            return;
+        }
+        
+        const banyanId = new PublicKey(banyanIdStr);
+        const [pda] = PublicKey.findProgramAddressSync([Buffer.from('manager_v4')], banyanId);
+        
+        const rpsPath = rootPath('programs/rps/src/treasury.bin');
+        const chessPath = rootPath('programs/idiot_chess/src/treasury.bin');
+        
+        fs.writeFileSync(rpsPath, pda.toBytes());
+        fs.writeFileSync(chessPath, pda.toBytes());
+        
+        console.log(`🏦 Injected Banyan Treasury PDA for ${network}: ${pda.toBase58()}`);
+    } catch (e) {
+        console.log(`⚠️ Failed to generate treasury bins: ${e.message}`);
+    }
+}
 
 async function build() {
     const target = process.argv[2];
+    const network = process.argv[3] || 'localnet';
+
+    generateTreasuries(network);
 
     try {
         if (!target || target === 'all') {

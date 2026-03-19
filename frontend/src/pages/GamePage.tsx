@@ -306,7 +306,7 @@ export default function GamePage() {
     setShowMoveModal(true);
   };
 
-  const handleClaimPrize = async () => {
+  const handledistributePrize = async () => {
     if (!publicKey || !gameId) {
       showToast('Wallet not connected', 'error');
       return;
@@ -315,7 +315,7 @@ export default function GamePage() {
     const toastId = showToast('Claiming prize...', 'loading');
     try {
       const programClient = createWeb3ProgramClient(connection, wallet);
-      await programClient.claimPrize(gameId);
+      await programClient.distributePrize(gameId);
       updateToast(toastId, t('rps.toasts.claimed_congrats'), 'success');
       await fetchGameData();
     } catch (error: any) {
@@ -442,7 +442,7 @@ export default function GamePage() {
                     {t('rps.game.deadline.stalled_note')}
                   </p>
                   <button
-                    onClick={handleClaimPrize}
+                    onClick={handledistributePrize}
                     style={{
                       padding: `${theme.spacing.sm} ${theme.spacing.lg}`,
                       backgroundColor: theme.colors.error,
@@ -471,7 +471,7 @@ export default function GamePage() {
         onRefresh={fetchGameData}
         onJoin={handleJoinMatch}
         isUserInGame={isUserInGame()}
-        onClaimPrize={handleClaimPrize}
+        ondistributePrize={handledistributePrize}
         gameAccountBalance={gameAccountBalance}
       />
 
@@ -492,3 +492,4 @@ export default function GamePage() {
     </div>
   );
 }
+

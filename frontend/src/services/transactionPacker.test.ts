@@ -4,7 +4,7 @@ import {
   InstructionType,
   MAX_PLAYERS,
   AccountSizeCalculator,
-} from './transactionPacker';
+} from '@throwdown/shared';
 
 describe('TransactionPacker', () => {
   describe('Constants', () => {
@@ -27,7 +27,7 @@ describe('TransactionPacker', () => {
       expect(InstructionType.CreateChallenge).toBe(0);
       expect(InstructionType.AcceptChallenge).toBe(1);
       expect(InstructionType.RevealMoves).toBe(2);
-      expect(InstructionType.ClaimPrize).toBe(3);
+      expect(InstructionType.distributePrize).toBe(3);
     });
   });
 
@@ -101,3 +101,4 @@ describe('TransactionPacker', () => {
     });
   });
 });
+

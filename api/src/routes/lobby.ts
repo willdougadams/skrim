@@ -14,7 +14,7 @@ router.get('/:type', async (req, res) => {
     try {
         const games = await withCache(`lobby_${type}`, 10, async () => {
             const programId = programIds[type as keyof typeof programIds];
-            const dataSize = type === 'chess' ? 272 : 528;
+            const dataSize = 208;
 
             const accounts = await connection.getProgramAccounts(programId, {
                 commitment: 'confirmed',

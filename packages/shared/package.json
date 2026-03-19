@@ -1,0 +1,17 @@
+{
+  "name": "@throwdown/shared",
+  "version": "1.0.0",
+  "description": "Shared code for throwdown API and frontend",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

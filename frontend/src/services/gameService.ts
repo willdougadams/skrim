@@ -1,6 +1,6 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getProgramId } from '../config/programIds';
-import { GameAccountDeserializer, WaitingAccountDeserializer, ChessGameAccountDeserializer } from './transactionPacker';
+import { GameAccountDeserializer, WaitingAccountDeserializer, ChessGameAccountDeserializer } from '@throwdown/shared';
 
 interface GameIndexEntry {
     game_address: string;

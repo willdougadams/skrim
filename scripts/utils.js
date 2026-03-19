@@ -2,7 +2,7 @@ const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 
 const isWindows = process.platform === 'win32';
-const LINUX_TOOLS = ['solana', 'cargo', 'solana-keygen', 'bash', 'anchor'];
+const LINUX_TOOLS = ['solana', 'cargo', 'solana-keygen', 'bash'];
 
 /**
  * Converts a Windows path to a WSL path.

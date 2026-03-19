@@ -18,7 +18,7 @@ async function main() {
     console.log(`Program ID: ${PROGRAM_ID.toString()}`);
     console.log(`Payer: ${payer.publicKey.toString()}`);
 
-    const [managerPda] = PublicKey.findProgramAddressSync([Buffer.from("manager_v3")], PROGRAM_ID);
+    const [managerPda] = PublicKey.findProgramAddressSync([Buffer.from("manager_v4")], PROGRAM_ID);
     console.log(`Manager PDA: ${managerPda.toString()}`);
 
     const data = Buffer.alloc(1);

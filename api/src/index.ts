@@ -4,7 +4,10 @@ import dotenv from 'dotenv';
 import lobbyRoutes from './routes/lobby';
 import banyanRoutes from './routes/banyan';
 import gameRoutes from './routes/game';
+import statsRoutes from './routes/stats';
+import crankRoutes from './routes/crank';
 import { subscriptionManager } from './services/subscriptionManager';
+import { statsService } from './services/statsService';
 
 dotenv.config();
 
@@ -19,6 +22,8 @@ const router = express.Router();
 router.use('/lobby', lobbyRoutes);
 router.use('/banyan', banyanRoutes);
 router.use('/game', gameRoutes);
+router.use('/stats', statsRoutes);
+router.use('/crank', crankRoutes);
 
 router.get('/health', (req, res) => {
     res.json({ status: 'ok' });
@@ -31,6 +36,7 @@ if (require.main === module) {
     app.listen(port, () => {
         console.log(`Trustful API listening at http://localhost:${port}`);
         subscriptionManager.startListening();
+        statsService.start();
     });
 }
 

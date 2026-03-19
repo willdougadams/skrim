@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import ThemeSelector from './ThemeSelector';
 import NetworkSelector from './NetworkSelector';
 import AirdropButton from './AirdropButton';
-import { Home, Wallet, Swords, Trees, Info, ChevronDown, ChevronUp, Settings2, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Wallet, Swords, Trees, Info, ChevronDown, ChevronUp, Settings2, ShieldCheck, ShieldAlert, BarChart3 } from 'lucide-react';
 import { theme } from '../theme';
 import { BanyanLogo } from './index';
 import { useNetwork } from '../contexts/NetworkContext';
@@ -132,12 +132,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobile = false }) => {
             {/* Navigation */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <NavButton
-                    onClick={() => navigate('/')}
-                    icon={Home}
-                    label={t('sidebar.nav.home')}
-                    active={currentPath === '/'}
-                />
-                <NavButton
                     onClick={() => navigate('/lobby')}
                     icon={Swords}
                     label={t('sidebar.nav.lobby', 'Lobby')}
@@ -148,6 +142,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobile = false }) => {
                     icon={Trees}
                     label={t('sidebar.nav.banyan')}
                     active={currentPath === '/great-banyan'}
+                />
+                <NavButton
+                    onClick={() => navigate('/crank')}
+                    icon={Settings2}
+                    label="Crank"
+                    active={currentPath === '/crank'}
+                />
+                <NavButton
+                    onClick={() => navigate('/stats')}
+                    icon={BarChart3}
+                    label="Stats"
+                    active={currentPath === '/stats'}
                 />
                 <NavButton
                     onClick={() => navigate('/about')}

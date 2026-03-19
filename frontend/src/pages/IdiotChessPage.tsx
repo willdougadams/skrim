@@ -128,12 +128,12 @@ const IdiotChessPage: React.FC<IdiotChessPageProps> = ({ gameId: propGameId, mod
 
     // handleReset removed as it is unused in the template
 
-    const handleClaimPrize = async () => {
+    const handledistributePrize = async () => {
         if (!isLive || !gameId || !connected) return;
         const toastId = showToast(t('chess.toasts.claiming'), 'loading');
         try {
             const client = createWeb3ProgramClient(connection, wallet, 'chess');
-            await client.claimChessPrize(gameId);
+            await client.distributeChessPrize(gameId);
             updateToast(toastId, t('chess.toasts.claimed'), 'success');
             refreshOnChain();
         } catch (e: any) {
@@ -261,7 +261,7 @@ const IdiotChessPage: React.FC<IdiotChessPageProps> = ({ gameId: propGameId, mod
                             (gameState.turn === 'black' && gameState.blackTimeSeconds <= 0)
                         ))) && onChainData && !onChainData.prizeClaimed && (
                                 <button
-                                    onClick={handleClaimPrize}
+                                    onClick={handledistributePrize}
                                     style={{
                                         padding: '0.6rem 1.5rem',
                                         backgroundColor: theme.colors.success,
@@ -383,3 +383,5 @@ const IdiotChessPage: React.FC<IdiotChessPageProps> = ({ gameId: propGameId, mod
 };
 
 export default IdiotChessPage;
+
+

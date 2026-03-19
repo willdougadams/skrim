@@ -55,13 +55,17 @@ async function main() {
 
     console.log(`Wallet: ${payer.publicKey.toString()} `);
 
+    const authorityStr = process.argv[3];
+    const authorityPubkey = authorityStr ? new PublicKey(authorityStr) : payer.publicKey;
+
     // 1. Initialize Game Manager
-    // Seeds: "manager"
+    // Seeds: "manager_v4"
     const [managerPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("manager_v1")],
+        [Buffer.from("manager_v4")],
         PROGRAM_ID
     );
     console.log(`Manager PDA: ${managerPda.toString()} `);
+    console.log(`Manager Authority: ${authorityPubkey.toString()} `);
 
     // Check if manager exists
     const managerInfo = await connection.getAccountInfo(managerPda);
@@ -77,7 +81,7 @@ async function main() {
             keys: [
                 { pubkey: payer.publicKey, isSigner: true, isWritable: true },
                 { pubkey: managerPda, isSigner: false, isWritable: true },
-                { pubkey: payer.publicKey, isSigner: false, isWritable: false }, // authority
+                { pubkey: authorityPubkey, isSigner: false, isWritable: false }, // authority
                 { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
             ],
             programId: PROGRAM_ID,
@@ -111,13 +115,21 @@ async function main() {
     epochBuffer.writeBigUInt64LE(currentEpoch);
 
     const [treePda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("tree"), epochBuffer],
+        [Buffer.from("tree_v4"), epochBuffer],
         PROGRAM_ID
     );
 
     // Root bud for this tree
     const [rootBudPda] = PublicKey.findProgramAddressSync(
         [Buffer.from("bud"), treePda.toBuffer(), Buffer.from("root")],
+        PROGRAM_ID
+    );
+    const [leftPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("bud"), rootBudPda.toBuffer(), Buffer.from("left")],
+        PROGRAM_ID
+    );
+    const [rightPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("bud"), rootBudPda.toBuffer(), Buffer.from("right")],
         PROGRAM_ID
     );
 
@@ -151,13 +163,15 @@ async function main() {
     data.writeBigUInt64LE(vitalityReq, offset);
 
     // Accounts for InitializeTree:
-    // Payer, Manager, TreeState, RootBud, SystemProgram
+    // Payer, Manager, TreeState, RootBud, LeftChild, RightChild, SystemProgram
     const tx = new Transaction().add({
         keys: [
             { pubkey: payer.publicKey, isSigner: true, isWritable: true },
             { pubkey: managerPda, isSigner: false, isWritable: true },
             { pubkey: treePda, isSigner: false, isWritable: true },
             { pubkey: rootBudPda, isSigner: false, isWritable: true },
+            { pubkey: leftPda, isSigner: false, isWritable: true },
+            { pubkey: rightPda, isSigner: false, isWritable: true },
             { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         ],
         programId: PROGRAM_ID,

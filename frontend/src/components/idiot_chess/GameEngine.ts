@@ -27,7 +27,7 @@ export const BOARD_SIZE = 5;
 
 
 
-export const INITIAL_BOARD: (Piece | null)[][] = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+const INITIAL_BOARD: (Piece | null)[][] = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
 
 // Setup initial positions
 // White (Bottom, y=0,1)

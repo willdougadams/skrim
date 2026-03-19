@@ -3,9 +3,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.devnet.solana.com';
+const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || 'https://mainnet.helius-rpc.com/?api-key=adaff95b-72b5-4898-b349-30a3c5a8f244';
 
 export const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+
+import { GameAccountDeserializer, ChessGameAccountDeserializer } from '@throwdown/shared';
 
 import fs from 'fs';
 import path from 'path';
@@ -18,8 +20,9 @@ try {
     console.warn('Could not load program-ids.json, falling back to defaults', e);
 }
 
-const network = process.env.NETWORK || 'devnet';
-const networkProgramIds = rawProgramIds[network] || rawProgramIds.devnet || {};
+const network = process.env.NETWORK || 'mainnet';
+const networkKey = network === 'mainnet-beta' ? 'mainnet' : network;
+const networkProgramIds = rawProgramIds[networkKey] || rawProgramIds.mainnet || rawProgramIds.devnet || {};
 
 export const programIds = {
     banyan: new PublicKey(networkProgramIds.banyan),
@@ -112,99 +115,42 @@ export class Deserializer {
     }
 
     static deserializeRPSGame(data: Buffer, pubkey: string): any {
-        const view = new DataView(data.buffer, data.byteOffset);
-        let offset = 0;
-
-        const creator = new PublicKey(data.subarray(offset, offset + 32)).toString();
-        offset += 32;
-        const name = new TextDecoder().decode(data.subarray(offset, offset + 64)).replace(/\0/g, '').trim();
-        offset += 64;
-        const description = new TextDecoder().decode(data.subarray(offset, offset + 256)).replace(/\0/g, '').trim();
-        offset += 256;
-
-        const max_players = view.getUint8(offset); offset += 1;
-        const current_players = view.getUint8(offset); offset += 1;
-        const state = view.getUint8(offset); offset += 1;
-        offset += 5; // padding
-        const last_action_timestamp = view.getBigInt64(offset, true); offset += 8;
-        const buy_in_lamports = view.getBigUint64(offset, true); offset += 8;
-        const prize_pool = view.getBigUint64(offset, true); offset += 8;
-
-        const players = [];
-        const playerSize = 72; // pubkey(32) + committed(32) + revealed(5) + eliminated(1) + padding(2)
-        for (let i = 0; i < 2; i++) {
-            const pOffset = offset + (i * playerSize);
-            const pPkBytes = data.subarray(pOffset, pOffset + 32);
-            if (!pPkBytes.every(b => b === 0)) {
-                players.push({
-                    pubkey: new PublicKey(pPkBytes).toString(),
-                    eliminated: view.getUint8(pOffset + 69) !== 0
-                });
-            }
-        }
-
-        const stateNames = ['WaitingForPlayers', 'InProgress', 'Finished'];
+        const game = GameAccountDeserializer.deserialize(new Uint8Array(data));
+        if (!game) return null;
+        
         return {
             game_address: pubkey,
-            creator,
-            name,
-            description,
-            max_players,
-            current_players: players.length,
-            buy_in_lamports: buy_in_lamports.toString(),
-            state: stateNames[state] || 'Unknown',
-            prize_pool: prize_pool.toString(),
-            last_action_timestamp: Number(last_action_timestamp),
-            player_addresses: players.map(p => p.pubkey),
-            winner: state === 2 ? players.find(p => !p.eliminated)?.pubkey : undefined
+            creator: game.creator,
+            name: game.name || "",
+            description: game.description || "",
+            max_players: game.max_players,
+            current_players: game.current_players,
+            buy_in_lamports: game.buy_in_lamports.toString(),
+            state: game.state,
+            prize_pool: game.prize_pool.toString(),
+            last_action_timestamp: game.last_action_timestamp,
+            player_addresses: game.players.map((p: any) => p.pubkey),
+            winner: game.state === 'Finished' ? game.players.find((p: any) => !p.eliminated)?.pubkey : undefined
         };
     }
 
     static deserializeChessGame(data: Buffer, pubkey: string): any {
-        const view = new DataView(data.buffer, data.byteOffset);
-        let offset = 0;
-
-        const creator = new PublicKey(data.subarray(offset, offset + 32)).toString();
-        offset += 32;
-        const name = new TextDecoder().decode(data.subarray(offset, offset + 64)).replace(/\0/g, '').trim();
-        offset += 64;
-
-        const last_action_timestamp = view.getBigInt64(offset, true); offset += 8;
-        const buy_in_lamports = view.getBigUint64(offset, true); offset += 8;
-        const prize_pool = view.getBigUint64(offset, true); offset += 8;
-        const white_time = view.getBigInt64(offset, true); offset += 8;
-        const black_time = view.getBigInt64(offset, true); offset += 8;
-
-        const players = [];
-        for (let i = 0; i < 2; i++) {
-            const pOffset = offset + (i * 40);
-            const pPkBytes = data.subarray(pOffset, pOffset + 32);
-            if (!pPkBytes.every(b => b === 0)) {
-                players.push({
-                    pubkey: new PublicKey(pPkBytes).toString(),
-                    eliminated: view.getUint8(pOffset + 32) !== 0
-                });
-            }
-        }
-        offset += 80;
-
-        // Board and other fields simplified for lobby
-        const winnerVal = view.getUint8(offset + 50 + 1); // offset + board(50) + turn(1)
-        const state = winnerVal !== 0 ? 'Finished' : (players.length < 2 ? 'WaitingForPlayers' : 'InProgress');
-
+        const game = ChessGameAccountDeserializer.deserialize(new Uint8Array(data));
+        if (!game) return null;
+        
         return {
             game_address: pubkey,
-            creator,
-            name,
-            description: '',
-            max_players: 2,
-            current_players: players.length,
-            buy_in_lamports: buy_in_lamports.toString(),
-            state,
-            prize_pool: prize_pool.toString(),
-            last_action_timestamp: Number(last_action_timestamp),
-            player_addresses: players.map(p => p.pubkey),
-            winner: winnerVal !== 0 && winnerVal < 3 ? players[winnerVal - 1]?.pubkey : undefined
+            creator: game.creator,
+            name: game.name || "",
+            description: game.description || "",
+            max_players: game.max_players || 2,
+            current_players: game.players.length,
+            buy_in_lamports: game.buy_in_lamports.toString(),
+            state: game.state,
+            prize_pool: game.prize_pool.toString(),
+            last_action_timestamp: game.last_action_timestamp,
+            player_addresses: game.players.map((p: any) => p.pubkey),
+            winner: game.winner === 1 ? game.players[0]?.pubkey : game.winner === 2 ? game.players[1]?.pubkey : undefined
         };
     }
 }

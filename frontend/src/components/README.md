@@ -10,7 +10,7 @@ This directory contains all the reusable components for the Rock Paper Scissors 
 - **`BracketDisplay.tsx`** - Tournament bracket visualization showing all rounds and matchups
 - **`MatchupTile.tsx`** - Individual matchup component showing player status, moves, and results
 - **`MoveSubmissionModal.tsx`** - Modal for submitting and revealing moves during gameplay
-- **`ClaimPrizeButton.tsx`** - Button for winners to claim their prize
+- **`distributePrizeButton.tsx`** - Button for winners to claim their prize
 
 ### Layout & UI
 
@@ -56,3 +56,4 @@ Components use the centralized theme system (`theme.ts`) with:
 - CSS variables for theme-aware colors
 - Consistent design tokens across all components
 - Support for light and dark themes
+

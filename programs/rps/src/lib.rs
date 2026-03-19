@@ -170,7 +170,7 @@ pub enum GameInstruction {
         moves: [Move; 5],
         salt: u64,
     },
-    ClaimPrize,
+    DistributePrize,
 }
 
 // ============================================================================
@@ -240,7 +240,7 @@ pub fn process_instruction(
             let salt = u64::from_le_bytes(instruction_data[6..14].try_into().unwrap());
             reveal_moves(_program_id, accounts, moves, salt)
         }
-        3 => claim_prize(_program_id, accounts),
+        3 => distribute_prize(_program_id, accounts),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -544,7 +544,7 @@ fn reveal_moves(program_id: &Pubkey, accounts: &[AccountInfo], moves: [Move; 5],
 
 // Matchmaking pool logic removed in favor of Challenge/Accept model
 
-fn claim_prize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+fn distribute_prize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
     let [winner, game_account, manager_info] = accounts.get(..3).ok_or(ProgramError::NotEnoughAccountKeys)? else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
@@ -554,8 +554,15 @@ fn claim_prize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
         return Err(ProgramError::InvalidAccountData);
     }
     
-    if !winner.is_signer() {
-        return Err(ProgramError::MissingRequiredSignature);
+    if winner.is_signer() {
+        // We no longer require the winner to be a signer so anyone can crank this instruction
+    }
+
+    // Validate Treasury PDA
+    const EXPECTED_TREASURY: &[u8; 32] = include_bytes!("treasury.bin");
+    if manager_info.key().as_ref() != EXPECTED_TREASURY.as_ref() {
+        msg!("Invalid treasury PDA");
+        return Err(ProgramError::InvalidAccountData);
     }
 
     let amount_to_transfer = {
@@ -777,3 +784,4 @@ pub unsafe extern "C" fn sol_memcpy_(dst: *mut u8, src: *const u8, n: usize) {
 pub unsafe extern "C" fn sol_memmove_(dst: *mut u8, src: *const u8, n: usize) {
     std::ptr::copy(src, dst, n);
 }
+

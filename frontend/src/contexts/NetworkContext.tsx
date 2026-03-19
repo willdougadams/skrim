@@ -37,7 +37,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    return 'devnet';
+    return 'mainnet-beta';
   });
 
   const [customRpcUrl, setCustomRpcUrl] = useState<string>(() => {
@@ -52,8 +52,8 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   const rpcUrl = useMemo(() => {
     if (network === 'localnet') return 'http://127.0.0.1:8899';
     if (network === 'devnet') return 'https://api.devnet.solana.com';
-    if (network === 'mainnet-beta') return 'https://api.mainnet-beta.solana.com';
-    return customRpcUrl || 'https://api.devnet.solana.com';
+    if (network === 'mainnet-beta') return 'https://mainnet.helius-rpc.com/?api-key=adaff95b-72b5-4898-b349-30a3c5a8f244';
+    return customRpcUrl || 'https://mainnet.helius-rpc.com/?api-key=adaff95b-72b5-4898-b349-30a3c5a8f244';
   }, [network, customRpcUrl]);
 
   const connection = useMemo(() => new Connection(rpcUrl, 'confirmed'), [rpcUrl]);

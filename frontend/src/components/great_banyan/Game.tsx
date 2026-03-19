@@ -202,13 +202,19 @@ export const GreatBanyanGame: React.FC = () => {
             view.setUint32(17, essenceBytes.length, true); // Essence Len
             data.set(essenceBytes, 21);
 
-            // Accounts: [payer, manager, bud, system_program, tree, left, right]
+            // Accounts: [payer, manager, bud, system_program, tree, left, right, next_tree, next_root, next_left, next_right]
             const [managerPda] = findGameManagerPda();
             if (!gameManager) throw new Error("Game Manager not loaded");
-            const [treePda] = findTreePda(BigInt(gameManager.currentEpoch));
+            const currentEpoch = BigInt(gameManager.currentEpoch);
+            const [treePda] = findTreePda(currentEpoch);
             const [leftPda] = findChildBudPda(selectedBudAddress, 'left');
             const [rightPda] = findChildBudPda(selectedBudAddress, 'right');
 
+            const nextEpoch = currentEpoch + 1n;
+            const [nextTreePda] = findTreePda(nextEpoch);
+            const [nextRootPda] = findBudPda(nextTreePda, 'root');
+            const [nextLeftPda] = findChildBudPda(nextRootPda, 'left');
+            const [nextRightPda] = findChildBudPda(nextRootPda, 'right');
 
             const tx = new Transaction().add({
                 keys: [
@@ -220,6 +226,11 @@ export const GreatBanyanGame: React.FC = () => {
                     { pubkey: treePda, isSigner: false, isWritable: false },
                     { pubkey: leftPda, isSigner: false, isWritable: true },
                     { pubkey: rightPda, isSigner: false, isWritable: true },
+                    // Extra accounts for next-epoch auto-initialization
+                    { pubkey: nextTreePda, isSigner: false, isWritable: true },
+                    { pubkey: nextRootPda, isSigner: false, isWritable: true },
+                    { pubkey: nextLeftPda, isSigner: false, isWritable: true },
+                    { pubkey: nextRightPda, isSigner: false, isWritable: true },
                 ],
                 programId: PROGRAM_ID,
                 data: Buffer.from(data),

@@ -63,8 +63,8 @@ class SubscriptionManager {
 
     private handleAccountUpdate(accountId: PublicKey, data: Buffer) {
         try {
-            // Let's try to determine what type of account it is based on length or anchor discriminator.
-            // Anchor discriminators are the first 8 bytes.
+            // Let's try to determine what type of account it is based on length or discriminator.
+            // Discriminators are the first 8 bytes.
             
             // Try Bud (8 + 32 + 32 + 8 + 1) = 81 bytes usually
             try {

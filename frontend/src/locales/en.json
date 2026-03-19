@@ -1,83 +1,30 @@
 {
     "common": {
-        "lobby": "Lobby",
-        "back": "Back",
-        "back_to_lobby": "Back to Lobby",
         "retry": "Retry",
         "loading": "Loading...",
         "loading_game_data": "Loading Game Data...",
-        "processing": "Processing...",
-        "error": "Error",
         "refreshing": "Refreshing...",
         "connect_wallet": "Please connect your wallet",
         "connect_wallet_to_move": "Connect wallet to make on-chain moves",
         "transaction_failed": "Transaction failed",
         "unknown_error": "Unknown error",
-        "status": "Status",
-        "total": "Total",
-        "winner": "Winner",
-        "players": "Players",
-        "view": "View",
-        "resume": "Resume",
-        "accept": "Accept",
         "cancel": "Cancel",
-        "create": "Create",
-        "confirm": "Confirm",
-        "success": "Success",
-        "prize_pool": "Prize Pool",
-        "sol_match": "{{fee}} SOL Match"
+        "create": "Create"
     },
     "sidebar": {
         "nav": {
-            "home": "Home",
-            "lobby": "1v1 Lobby",
-            "banyan": "Great Banyan",
+            "lobby": "Lobby",
+            "banyan": "The Great Banyan",
             "about": "About"
-        }
-    },
-    "landing": {
-        "games": {
-            "rps": {
-                "title": "Rock Paper Scissors",
-                "description": "Best of 5 RPS.  Channel your rage, find tranquility, or use trickery to outwit your opponent."
-            },
-            "chess": {
-                "title": "Idiot Chess",
-                "description": "5x5 chess with pawns who forgot how they move.  Capture all your opponent's Kings to defeat them!"
-            },
-            "banyan": {
-                "title": "Great Banyan",
-                "description": "It take a villiage to raise a banyan tree.  Nuture its branches to find the fruit of our labor.  All nurturers get a bite of the fruit."
-            }
-        },
-        "why_skrim": {
-            "title": "How it works",
-            "on_chain": {
-                "title": "Fully On-Chain",
-                "description": "All game logic and state is on-chain.  Secrets (like your RPS moves) are stored as a hash and revealed by proving the hash later.  Don't delete your cookies mid-game, they're holding onto your moves and salt"
-            },
-            "trustlessness": {
-                "title": "Trustlessness",
-                "description": "Skrim will quickly hit rate limits for public RPCs.  If you want pure trustlessness, you can use a custom RPC url in the settings.  \"Trustful Mode\" is enabled by default, which fetches on-chain data through Skrim's API.  You can trust me, but if you don't want to, you can just turn off trustful mode!"
-            },
-            "payouts": {
-                "title": "Community is an Activity",
-                "description": "As the tendrils of the banyan intertwine to support one another, so shall the scrimmages of individual conflict support each of us in turn. One percent of each 1v1 prize pool is given as tribute to The Great Banyan.  Those who nurture the banyan may be lucky enough to find its fruit."
-            }
-        },
-        "play_now": "Play Now",
-        "banner": {
-            "title": "Under Construction",
-            "message": "Throwdown is currently in active development. Games are only available on Solana Devnet for now."
         }
     },
     "about": {
         "title": "About Skrim",
-        "subtitle": "Pushing the boundaries of decentralized gaming on Solana.",
+        "subtitle": "",
         "sections": {
             "why_blockchain": {
                 "title": "Why Blockchain?",
-                "content": "I don't want to know your email. Compliance is a chore, any data about you I collect I have to secure and manage.  I'd rather just know you by your key and let Solana handle authentication.",
+                "content": "Because serverless still needs to persist somewhere.  \n\nSeriously though, I don't want to know your email. Compliance is a chore, any data about you I collect I have to secure and manage.  I'd rather just know you by your key and let Solana handle authentication.",
                 "features": {
                     "fairness": {
                         "title": "Provable Fairness",
@@ -92,7 +39,7 @@
             "developer": {
                 "title": "About the Developer",
                 "intro": "Hello, I'm Will",
-                "bio": "I've been engineering at early-stage SaaS startups for ~5 years, before that I was at larger companies like Google and US DoD.\n\nI've been partcipating in Crypto stuff since I found Solana in 2020. Despite the prevelance of bologna in the crypto world, the core tech (see above about not wanting your email) is pretty cool.",
+                "bio": "I've been engineering at early-stage SaaS startups for ~5 years, before that I was at larger companies like Google and US DoD.  I've been partcipating in Crypto stuff since I found Solana in 2020. Despite the prevelance of *ahem* questionable ethics in the crypto world, the core tech (see above about not wanting your email) is pretty cool.",
                 "skills_title": "Skills",
                 "skills_list": [
                     "Frontend / Backend / Infra",
@@ -105,16 +52,16 @@
                 "title": "Roadmap",
                 "phases": [
                     {
-                        "title": "Phase 1: Foundation (Current)",
-                        "description": "Core lobby system, RPS with commit-reveal, and the release of Idiot Chess 5x5."
+                        "title": "Phase 1: Initial Games (Current)",
+                        "description": "Core lobby system, RPS++, Idiot Chess, and The Great Banyan"
                     },
                     {
-                        "title": "Phase 2: Growth & Social",
-                        "description": "In-game chat, player profiles, global leaderboards."
+                        "title": "Phase 2: Platform Features",
+                        "description": "In-game chat, player ELO system, and more games."
                     },
                     {
-                        "title": "Phase 3: Ecosystem Expansion",
-                        "description": "Mobile PWA optimization, and SDK for community-built games."
+                        "title": "Phase 3: Expansion",
+                        "description": "Mobile PWA optimization, and IDL for community games to integrate with The Great Banyan."
                     }
                 ]
             }
@@ -122,25 +69,10 @@
         "footer": "Made with ❤️ for the Solana Community."
     },
     "rps": {
-        "lobby": {
-            "title": "Rock Paper Scissors",
-            "subtitle": "Join the queue and battle for SOL prizes",
-            "open_challenges": "Open Challenges",
-            "create_challenge": "Create Challenge",
-            "no_challenges": "No open challenges found. Create one to start playing!",
-            "accept_challenge": "Accept Challenge",
-            "your_challenge": "Your Challenge",
-            "reveal_view": "Reveal / View",
-            "view": "View",
-            "reveal": "Reveal",
-            "claim": "Claim"
-        },
         "create_modal": {
             "title": "Create Challenge",
             "entry_fee": "Entry Fee (SOL)",
-            "continue_moves": "Continue to Move Selection",
             "select_moves": "Select your 5 moves for the challenge:",
-            "back": "Back",
             "create_for": "Create for {{fee}} SOL"
         },
         "accept_modal": {
@@ -151,37 +83,19 @@
         },
         "game": {
             "matchup_title": "Matchup",
-            "loading_data": "Loading Game Data...",
             "error_loading": "Error Loading Game",
             "not_found": "Game Not Found",
             "load_failed": "Failed to load game data. Please try again.",
             "select_all_moves": "Please select all moves",
             "no_moves_to_reveal": "No moves to reveal - please submit moves first",
             "back_to_lobby": "Back to Lobby",
-            "winner_is": "Winner: {{winner}}",
-            "you": "You",
-            "opponent": "Opponent",
-            "reveal_moves": "Reveal My Moves",
-            "claim_prize": "Claim Prize Pool",
-            "prizes_claimed": "Prizes Claimed!",
-            "security": "Game Security",
-            "security_note": "All moves are committed on-chain and only revealed simultaneously to ensure complete fairness.",
-            "players_info": "Players",
-            "player_n": "Player {{n}}",
+            "distribute_prize": "Claim Prize Pool",
             "player_label": "Player",
             "match_winner": "MATCH WINNER",
             "prize_claimed_sol": "Prize Claimed: {{amount}} SOL",
-            "claim_prize_sol": "Claim Prize ({{amount}} SOL)",
-            "move_n": "Move {{n}}",
-            "choose_move": "Choose your move",
-            "selected_move": "Selected: {{move}}",
-            "ready_submit": "Ready to Submit!",
-            "select_all_prompt": "Select All Moves",
-            "hidden_note": "Your moves will be hidden until the reveal phase.",
-            "moves_selected_count": "You've selected {{count}}/5 moves",
+            "distribute_prize_sol": "Claim Prize ({{amount}} SOL)",
             "submit_moves_btn": "Submit Moves ({{count}}/5)",
             "strategies_label": "Strategies",
-            "unavailable_round1": "Unavailable Round 1",
             "reveal_title": "Reveal Your Moves",
             "waiting_opponent_title": "Waiting for Opponent",
             "moves_not_found": "Moves Not Found Locally",
@@ -208,20 +122,11 @@
             },
             "strategy_descriptions": {
                 "fury_title": "Fury",
-                "fury_desc": "Fury captures the momentum of combat. It chooses the move that would have defeated your opponent's move from the previous round.",
+                "fury_desc": "Choose the move that would have defeated your opponent's move from the previous round.  Your rage will crush them, their lamentations will echo only briefly",
                 "serenity_title": "Serenity",
-                "serenity_desc": "Serenity reflects a calm, unwavering spirit. It repeats the same move you performed in the previous round.",
+                "serenity_desc": "Repeat the same move you performed in the previous round. Your path is clear to you, you will not let those who oppose you make you falter.",
                 "trickery_title": "Trickery",
-                "trickery_desc": "Trickery is the art of deception. It chooses the move that would have lost to your opponent's move from the previous round, luring them into a false sense of security."
-            },
-            "match_states": {
-                "waiting_for_players": "Waiting for Players",
-                "ready_to_play": "Ready to Play",
-                "waiting_for_moves": "Submitting Moves",
-                "waiting_for_reveals": "Revealing Moves",
-                "completed": "Completed",
-                "click_to_play": "Click to Play",
-                "unknown": "Unknown"
+                "trickery_desc": "Choose the move that would have lost to your opponent's move from the previous round, luring them into a false sense of security. Strike when their hubris overwhelms them."
             }
         },
         "toasts": {
@@ -231,62 +136,39 @@
             "accepting": "Accepting challenge...",
             "accepted": "Challenge accepted!",
             "accept_failed": "Failed to accept challenge",
-            "select_all": "Please select all moves",
             "joining_submitting": "Joining and submitting moves...",
             "joined": "Successfully joined match!",
             "join_failed": "Failed to join match",
-            "no_moves_reveal": "No moves to reveal - please submit moves first",
             "revealing": "Revealing moves...",
             "revealed": "Moves revealed!",
             "revealed_auto": "Moves revealed! Matchup will be resolved automatically.",
             "reveal_failed": "Failed to reveal moves - please try again",
-            "claiming": "Claiming prize...",
             "claimed": "Prizes claimed!",
             "claimed_congrats": "Congratulations! Prize transferred to your wallet!",
             "claim_failed": "Failed to claim prize",
             "claim_failed_reason": "Failed to claim prize: {{reason}}"
+        },
+        "match_states": {
+            "waiting_for_players": "Waiting for Players",
+            "ready_to_play": "Ready to Play",
+            "waiting_for_moves": "Submitting Moves",
+            "waiting_for_reveals": "Revealing Moves",
+            "completed": "Completed",
+            "click_to_play": "Click to Play",
+            "unknown": "Unknown"
         }
     },
     "chess": {
         "navbar": {
             "lobby": "Lobby"
         },
-        "lobby": {
-            "title": "Idiot Chess",
-            "subtitle": "5x5 Chess on Solana. Fast, brutal, on-chain.",
-            "practice_mode": "Practice Mode",
-            "new_challenge": "New Challenge",
-            "active_challenges": "Active Challenges",
-            "no_challenges": "No open challenges yet.",
-            "create_first": "Be the first to create one!",
-            "resume_game": "Resume Game",
-            "accept_challenge": "Accept Challenge",
-            "view_game": "View Game",
-            "how_to_play": {
-                "title": "How to play",
-                "rule1": "5x5 mini-chessboard",
-                "rule2": "Pawns can move straight forward or ",
-                "rule3": "diagonally forward one square",
-                "rule4": "but can only capture diagonally",
-                "rule5": "If your king is your last piece,",
-                "rule6": "A new pawn will spawn",
-                "rule7": "Capture all enemy Kings to win!"
-            },
-            "diagram": {
-                "straight": "Straight: Move Only (No Capture)",
-                "diagonal": "Diagonal: Move & Capture"
-            }
-        },
         "create_modal": {
             "title": "New Challenge",
-            "game_name": "Game Name (Optional)",
-            "game_name_placeholder": "My Epic Match",
             "entry_fee": "Entry Fee (SOL)"
         },
         "game": {
             "live_mode": "LIVE ON-CHAIN MATCH",
             "practice_mode": "LOCAL PRACTICE MODE",
-            "claim_prize": "Claim Prize Pool",
             "waiting_opponent": "Waiting for opponent to move on-chain...",
             "prize_pool_title": "Prize Pool Details",
             "pot_total": "Pot Total",
@@ -294,7 +176,9 @@
             "distributed": "Distributed",
             "locked": "Locked in Escrow",
             "opponent_addr": "Opponent Address",
-            "return_to_lobby": "Return to Lobby"
+            "return_to_lobby": "Return to Lobby",
+            "you_win": "You Win!",
+            "you_lose": "You Lose!"
         },
         "toasts": {
             "creating": "Creating chess challenge...",
@@ -305,7 +189,6 @@
             "accept_failed": "Failed to accept challenge",
             "submitting": "Submitting move to Solana...",
             "confirmed": "Move confirmed!",
-            "move_failed": "Transaction failed",
             "claiming": "Claiming prize...",
             "claimed": "Prize claimed!",
             "claim_failed": "Claim failed"

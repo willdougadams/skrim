@@ -14,7 +14,7 @@ fn main() {
     let banyan_id = devnet_section[banyan_start..].split('"').next().unwrap();
 
     let program_id = Pubkey::from_str(banyan_id).unwrap();
-    let (pda, _bump) = Pubkey::find_program_address(&[b"manager_v3"], &program_id);
+    let (pda, _bump) = Pubkey::find_program_address(&[b"manager_v4"], &program_id);
     println!("PDA String: {}", pda.to_string());
     println!("PDA Bytes: {:?}", pda.to_bytes());
 }

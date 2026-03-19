@@ -1,37 +1,18 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-
 import { useNetwork } from './NetworkContext';
+import { GameListItem } from '../services/gameClient';
 
-
-export interface GameListItem {
-  id: string;
-  name: string;
-  description: string;
-  status: 'waiting' | 'in_progress' | 'completed';
-  players: string[];
-  maxPlayers: number;
-  createdAt: string;
-  buyInSOL: number;
-  creator: string;
-  prizePool: number;
-  currentRound?: number;
-  totalRounds?: number;
-  winner?: string;
-}
-
-export interface UserGame {
-  id: string;
-  status: 'waiting' | 'in_progress' | 'completed';
-  maxPlayers: number;
-  currentPlayers: number;
+export interface EnrichedGame extends GameListItem {
+  gameType: 'rps' | 'chess';
+  isParticipating: boolean;
   isCreator: boolean;
-  buyInSOL: number;
 }
 
 interface GamesContextType {
-  allGames: GameListItem[];
-  userGames: UserGame[];
+  rpsGames: EnrichedGame[];
+  chessGames: EnrichedGame[];
+  allChallenges: EnrichedGame[];
   loading: boolean;
   error: string | null;
   refreshGames: () => Promise<void>;
@@ -43,8 +24,9 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
   const { connection, activeClient } = useNetwork();
   const { publicKey } = useWallet();
 
-  const [allGames, setAllGames] = useState<GameListItem[]>([]);
-  const [userGames, setUserGames] = useState<UserGame[]>([]);
+  const [rpsGames, setRpsGames] = useState<EnrichedGame[]>([]);
+  const [chessGames, setChessGames] = useState<EnrichedGame[]>([]);
+  const [allChallenges, setAllChallenges] = useState<EnrichedGame[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,85 +40,77 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      // Fetch all games for the lobby
-      const fetchedGames = await activeClient.getLobbyGames('rps');
+      const [_rpsGames, _chessGames] = await Promise.all([
+        activeClient.getLobbyGames('rps'),
+        activeClient.getLobbyGames('chess')
+      ]);
 
-      console.log('Fetched games:', fetchedGames);
-      setAllGames(fetchedGames);
+      const enrichGame = (game: GameListItem, type: 'rps' | 'chess'): EnrichedGame => {
+        const isCreator = publicKey ? game.creator === publicKey.toString() : false;
+        const isParticipating = publicKey ? game.players.includes(publicKey.toString()) : false;
+        return {
+          ...game,
+          gameType: type,
+          isCreator,
+          isParticipating
+        };
+      };
 
-      // If user is connected, filter their games
-      if (publicKey) {
-        // Fallback or specific logic for user games if Trustful client doesn't support batching well
-        // For now, using activeClient to get details for each game
-        const rawGames = await activeClient.getLobbyGames('rps');
-        const userParticipatingGames = [];
+      const mappedRpsGames = _rpsGames.map(g => enrichGame(g, 'rps'));
+      const mappedChessGames = _chessGames.map(g => enrichGame(g, 'chess'));
 
-        for (const game of rawGames) {
-          const isCreator = game.creator === publicKey.toString();
-          let isParticipating = isCreator;
+      setRpsGames(mappedRpsGames);
+      setChessGames(mappedChessGames);
 
-          if (!isCreator) {
-            try {
-              const gameDetails = await activeClient.getGameDetails('rps', game.id);
+      // Construct a unified challenges list for the lobby
+      // Only include waiting games, or games the active user is participating in
+      const validRpsGames = mappedRpsGames.filter(g => g.status === 'waiting' || g.isParticipating);
+      // For chess, 'in_progress' is also relevant to show for participants
+      const validChessGames = mappedChessGames.filter(g => g.status === 'waiting' || (g.status === 'in_progress' && g.isParticipating));
 
-              if (gameDetails && gameDetails.players) {
-                isParticipating = gameDetails.players.some((player: any) =>
-                  (player.pubkey || player.toString()) === publicKey.toString()
-                );
-              }
-            } catch (error) {
-              console.log('Error checking participation in game:', game.id);
+      const merged = [...validRpsGames, ...validChessGames];
+      // Sort: waiting first, then by highest buy-in
+      merged.sort((a, b) => {
+        if (a.status === 'waiting' && b.status !== 'waiting') return -1;
+        if (a.status !== 'waiting' && b.status === 'waiting') return 1;
+        return b.buyInSOL - a.buyInSOL;
+      });
 
-            }
-          }
+      setAllChallenges(merged);
 
-          if (isParticipating) {
-            userParticipatingGames.push({
-              ...game,
-              isCreator
-            });
-          }
-        }
-
-        const formattedUserGames: UserGame[] = userParticipatingGames.map((game: any) => ({
-          id: game.id,
-
-          status: game.state === 'WaitingForPlayers' ? 'waiting' :
-            game.state === 'Finished' ? 'completed' : 'in_progress',
-          maxPlayers: game.max_players,
-          currentPlayers: game.current_players,
-          isCreator: game.isCreator,
-          buyInSOL: parseFloat((Number(game.buy_in_lamports) / 1_000_000_000).toFixed(3))
-        }));
-
-        setUserGames(formattedUserGames);
-      } else {
-        setUserGames([]);
-      }
     } catch (err) {
       console.error('Error fetching games:', err);
       setError('Failed to load games. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [connection, publicKey]);
+  }, [connection, activeClient, publicKey]);
 
-  // Fetch games when connection or wallet changes
+  // Initial fetch and setup polling interval
   useEffect(() => {
     refreshGames();
+    const interval = setInterval(refreshGames, 10000);
+    return () => clearInterval(interval);
   }, [refreshGames]);
 
   return (
-    <GamesContext.Provider value={{ allGames, userGames, loading, error, refreshGames }}>
+    <GamesContext.Provider value={{
+      rpsGames,
+      chessGames,
+      allChallenges,
+      loading,
+      error,
+      refreshGames
+    }}>
       {children}
     </GamesContext.Provider>
   );
 }
 
 export function useGames() {
-  const context = useContext(GamesContext);
-  if (!context) {
-    throw new Error('useGames must be used within GamesProvider');
+  const context = React.useContext(GamesContext);
+  if (context === undefined) {
+    throw new Error('useGames must be used within a GamesProvider');
   }
   return context;
 }

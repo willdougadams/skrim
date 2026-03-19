@@ -156,7 +156,7 @@ async function playRPS() {
 
     // Alice claims
     console.log("Alice claiming prize...");
-    const managerPda = PublicKey.findProgramAddressSync([Buffer.from("manager_v1")], PROGRAM_IDS.banyan)[0];
+    const managerPda = PublicKey.findProgramAddressSync([Buffer.from("manager_v4")], PROGRAM_IDS.banyan)[0];
     const claimIx = new TransactionInstruction({
         keys: [
             { pubkey: alice.publicKey, isSigner: true, isWritable: true },
@@ -238,7 +238,7 @@ async function playChess() {
     // 0. Alice moves (0,0) -> (0,1)
     console.log("Move 0: Alice (0,0) -> (0,1)");
     let move = Buffer.from([2, 0, 0, 0, 1]);
-    const treasury = PublicKey.findProgramAddressSync([Buffer.from("manager_v1")], PROGRAM_IDS.banyan)[0];
+    const treasury = PublicKey.findProgramAddressSync([Buffer.from("manager_v4")], PROGRAM_IDS.banyan)[0];
 
     let moveIx = new TransactionInstruction({
         keys: [
@@ -396,7 +396,7 @@ async function playChess() {
 async function playBanyan() {
     console.log("\n🌿 Starting Banyan...");
 
-    const managerPda = PublicKey.findProgramAddressSync([Buffer.from("manager_v1")], PROGRAM_IDS.banyan)[0];
+    const managerPda = PublicKey.findProgramAddressSync([Buffer.from("manager_v4")], PROGRAM_IDS.banyan)[0];
     const treasury = managerPda;
 
     // 1. Initialize Game (singleton) - might already be done

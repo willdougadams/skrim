@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { theme } from '../theme';
 
-export type ToastType = 'success' | 'error' | 'info' | 'loading';
+type ToastType = 'success' | 'error' | 'info' | 'loading';
 
-export interface Toast {
+interface Toast {
   id: string;
   message: string;
   type: ToastType;

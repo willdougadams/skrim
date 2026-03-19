@@ -1,5 +1,6 @@
 import { PublicKey } from '@solana/web3.js';
 
+
 /**
  * Transaction Packer for Skrim RPS Game
  *
@@ -18,14 +19,10 @@ export enum Move {
   Trickery = 5,
 }
 
-export enum GameState {
-  WaitingForPlayers = 0,
-  InProgress = 1,
-  Finished = 2,
-}
+
 
 export const MAX_PLAYERS = 2;
-export const MAX_ROUNDS = 1;
+
 
 /**
  * Instruction discriminators matching the Rust program
@@ -34,7 +31,7 @@ export enum InstructionType {
   CreateChallenge = 0,
   AcceptChallenge = 1,
   RevealMoves = 2,
-  ClaimPrize = 3,
+  distributePrize = 3,
 }
 
 export class TransactionPacker {
@@ -96,11 +93,11 @@ export class TransactionPacker {
   }
 
   /**
-   * Pack ClaimPrize instruction
+   * Pack distributePrize instruction
    * Format: [discriminator: u8]
    */
-  static packClaimPrize(): Uint8Array {
-    return new Uint8Array([InstructionType.ClaimPrize]);
+  static packdistributePrize(): Uint8Array {
+    return new Uint8Array([InstructionType.distributePrize]);
   }
 
 
@@ -306,11 +303,11 @@ export class AccountSizeCalculator {
 /**
  * Transaction Packer for Skrim Idiot Chess Game
  */
-export enum ChessInstructionType {
+enum ChessInstructionType {
   CreateChallenge = 0,
   AcceptChallenge = 1,
   MakeMove = 2,
-  ClaimPrize = 3,
+  distributePrize = 3,
 }
 
 export class ChessTransactionPacker {
@@ -336,8 +333,8 @@ export class ChessTransactionPacker {
     ]);
   }
 
-  static packClaimPrize(): Uint8Array {
-    return new Uint8Array([ChessInstructionType.ClaimPrize]);
+  static packdistributePrize(): Uint8Array {
+    return new Uint8Array([ChessInstructionType.distributePrize]);
   }
 }
 
@@ -457,3 +454,4 @@ export class ChessGameAccountDeserializer {
     };
   }
 }
+

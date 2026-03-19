@@ -27,7 +27,7 @@ router.get('/manager', async (req, res) => {
     try {
         const manager = await withCache('banyan_manager', 60, async () => {
             const [managerPda] = PublicKey.findProgramAddressSync(
-                [new TextEncoder().encode('manager_v2')],
+                [new TextEncoder().encode('manager_v4')],
                 programIds.banyan
             );
             const info = await connection.getAccountInfo(managerPda);
@@ -49,7 +49,7 @@ router.get('/tree/:epoch', async (req, res) => {
             new DataView(epochBuffer.buffer).setBigUint64(0, epochBigInt, true);
 
             const [treePda] = PublicKey.findProgramAddressSync(
-                [new TextEncoder().encode('tree'), epochBuffer],
+                [new TextEncoder().encode('tree_v4'), epochBuffer],
                 programIds.banyan
             );
             const info = await connection.getAccountInfo(treePda);

@@ -59,34 +59,34 @@ test-frontend:
 
 # Build RPS program
 build-rps:
-	@node scripts/build.js rps
+	@node scripts/build.js rps $(NETWORK)
 
 # Build Great Banyan
 build-banyan:
-	@node scripts/build.js banyan
+	@node scripts/build.js banyan $(NETWORK)
 
 # Build Chess program
 build-chess:
-	@node scripts/build.js chess
+	@node scripts/build.js chess $(NETWORK)
 
 # Build everything
 build:
-	@node scripts/build.js all
+	@node scripts/build.js all $(NETWORK)
 
 # Build frontend for production
 build-frontend:
 	@node scripts/build.js frontend
 
 # Deploy RPS
-deploy-rps:
+deploy-rps: build-rps
 	@node scripts/deploy.js rps $(NETWORK)
 
 # Deploy Great Banyan
-deploy-banyan:
+deploy-banyan: build-banyan
 	@node scripts/deploy.js banyan $(NETWORK)
 
 # Deploy Chess
-deploy-chess:
+deploy-chess: build-chess
 	@node scripts/deploy.js chess $(NETWORK)
 
 # Start frontend dev server
@@ -127,7 +127,7 @@ coverage-program:
 
 init-banyan:
 	@echo "🌱 Initializing Banyan on $(NETWORK)..."
-	@cd frontend && npx tsx scripts/init-banyan.ts $(NETWORK)
+	@cd frontend && npx tsx scripts/init-banyan.ts $(NETWORK) $(AUTHORITY)
 
 banyan-bot:
 	@echo "🤖 Starting Banyan Bot on $(NETWORK)..."

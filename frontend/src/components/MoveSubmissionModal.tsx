@@ -254,13 +254,18 @@ export function MoveSubmissionModal({
                       opacity: index === 0 ? 0.4 : 1,
                       pointerEvents: index === 0 ? 'none' : 'auto'
                     }}>
-                      {(['fury', 'serenity', 'trickery'] as const).map((s) => {
+                      {(['fury', 'trickery', 'serenity'] as const).map((s) => {
                         const Icon = s === 'fury' ? Zap : s === 'serenity' ? Wind : Sparkles;
                         const isSelected = selectedMoves[index] === s;
+                        const lastMove = index > 0 ? selectedMoves[index - 1] : undefined;
+                        const isSerenityDisabled = s === 'serenity' && index > 0 && (!lastMove || !['fury', 'trickery', 'serenity'].includes(lastMove));
                         return (
                           <button
                             key={s}
-                            onClick={() => handleMoveSelectWithScroll(index, s)}
+                            onClick={() => {
+                              if (!isSerenityDisabled) handleMoveSelectWithScroll(index, s);
+                            }}
+                            disabled={isSerenityDisabled}
                             style={{
                               aspectRatio: '1',
                               display: 'flex',
@@ -272,7 +277,8 @@ export function MoveSubmissionModal({
                               border: `2px solid ${isSelected ? '#9c27b0' : theme.colors.border}`,
                               backgroundColor: isSelected ? 'rgba(156, 39, 176, 0.1)' : theme.colors.surface,
                               color: isSelected ? '#9c27b0' : theme.colors.text.primary,
-                              cursor: 'pointer',
+                              cursor: isSerenityDisabled ? 'not-allowed' : 'pointer',
+                              opacity: isSerenityDisabled ? 0.4 : 1,
                               transition: 'all 0.2s',
                               padding: '0.5rem'
                             }}

@@ -1,10 +1,10 @@
 import { PublicKey } from '@solana/web3.js';
 import programIds from '../../../scripts/program-ids.json';
 
-export type Network = 'localnet' | 'devnet' | 'mainnet-beta' | 'custom';
+type Network = 'localnet' | 'devnet' | 'mainnet-beta' | 'custom';
 
 // Auto-detect network from localStorage or URL
-export function getCurrentNetwork(): Network {
+function getCurrentNetwork(): Network {
   if (typeof window === 'undefined') return 'localnet';
 
   // First, check localStorage for user's network selection
@@ -26,7 +26,7 @@ export function getCurrentNetwork(): Network {
     return 'localnet';
   }
 
-  return 'devnet';
+  return 'mainnet-beta';
 }
 
 export function getProgramId(program: 'banyan' | 'rps' | 'chess' = 'rps', network?: Network): PublicKey {

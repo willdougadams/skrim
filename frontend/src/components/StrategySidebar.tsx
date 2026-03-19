@@ -42,18 +42,18 @@ export function StrategySidebar({
                 {t('rps.game.strategies_label')}
             </h3>
 
-            {(['fury', 'serenity', 'trickery'] as const).map(strategy => {
+            {(['fury', 'trickery', 'serenity'] as const).map(strategy => {
                 const Icon = strategy === 'fury' ? Zap : strategy === 'serenity' ? Wind : Sparkles;
                 return (
                     <div key={strategy} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9c27b0' }}>
                             <Icon size={18} fill={strategy === 'fury' ? 'currentColor' : 'none'} />
-                            <span style={{ fontWeight: theme.fontWeight.bold, fontSize: theme.fontSize.sm }}>
+                            <span style={{ fontWeight: theme.fontWeight.bold, fontSize: theme.fontSize.md }}>
                                 {t(`rps.game.strategy_descriptions.${strategy}_title`)}
                             </span>
                         </div>
                         <p style={{
-                            fontSize: '0.8rem',
+                            fontSize: theme.fontSize.md,
                             color: theme.colors.text.secondary,
                             lineHeight: '1.4',
                             margin: 0,

@@ -50,14 +50,19 @@ export class TrustfulClient implements GameClient {
         if (!response.ok) throw new Error('Failed to fetch lobby');
         const data = await response.json();
         return data.map((g: any) => ({
-            ...g,
-            buyInSOL: Number(g.buy_in_lamports) / 1_000_000_000,
-            prizePool: Number(g.prize_pool) / 1_000_000_000,
+            id: g.game_address,
+            name: g.name,
+            description: g.description,
             status: g.state === 'WaitingForPlayers' ? 'waiting' :
                 g.state === 'Finished' ? 'completed' : 'in_progress',
-            createdAt: new Date(g.last_action_timestamp * 1000).toISOString().split('T')[0],
             players: g.player_addresses,
-            id: g.game_address
+            maxPlayers: g.max_players,
+            createdAt: new Date(g.last_action_timestamp * 1000).toISOString().split('T')[0],
+            buyInSOL: Number(g.buy_in_lamports) / 1_000_000_000,
+            creator: g.creator,
+            prizePool: Number(g.prize_pool) / 1_000_000_000,
+            winner: g.winner,
+            lamports: g.lamports || 0
         }));
     }
 
@@ -92,6 +97,18 @@ export class TrustfulClient implements GameClient {
     async getBanyanBud(address: string): Promise<BudData | null> {
         const response = await fetch(`${this.baseUrl}/banyan/bud/${address}`);
         if (!response.ok) return null;
+        return response.json();
+    }
+
+    async getGlobalStats(): Promise<any | null> {
+        const response = await fetch(`${this.baseUrl}/stats`);
+        if (!response.ok) return null;
+        return response.json();
+    }
+
+    async getCrankableTxns(): Promise<any[]> {
+        const response = await fetch(`${this.baseUrl}/crank`);
+        if (!response.ok) return [];
         return response.json();
     }
 }

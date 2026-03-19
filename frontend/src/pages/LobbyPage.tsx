@@ -1,30 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { createWeb3ProgramClient } from '../services/web3ProgramClient';
-import { GameService } from '../services/gameService';
+import { useGames, EnrichedGame } from '../contexts/GamesContext';
 import { Swords, Zap, Wind, Sparkles, X, Circle, FileText, Scissors, Trophy, Users, ChevronRight, Computer, Info } from 'lucide-react';
 import { theme } from '../theme';
 import { generateReadableName } from '../utils/nameGenerator';
 import { useToast } from '../contexts/ToastContext';
 import { StrategySidebar } from '../components/StrategySidebar';
 
-interface Challenge {
-    id: string;
-    creator: string;
-    buyInSOL: number;
-    players: string[];
-    status: 'waiting' | 'in_progress' | 'completed';
-    gameType: 'rps' | 'chess';
-    winner?: string;
-    lamports: number;
-}
-
 interface RPSGameModalProps {
     onClose: () => void;
     mode: 'create' | 'accept';
-    challenge?: Challenge | null;
+    challenge?: EnrichedGame | null;
     onCreate?: (entryFee: number, moves: number[]) => void;
     onAccept?: (moves: number[]) => void;
     isMobile: boolean;
@@ -39,17 +28,15 @@ function RPSGameModal({
     isMobile
 }: RPSGameModalProps) {
     const { t } = useTranslation();
-    const [entryFee, setEntryFee] = useState(0.1);
+    const isCreate = mode === 'create';
+    const [entryFee, setEntryFee] = useState(isCreate ? 0.1 : (challenge?.buyInSOL || 0.1));
     const [moves, setMoves] = useState<number[]>([]);
-    const [step, setStep] = useState<'config' | 'moves'>(mode === 'create' ? 'config' : 'moves');
 
     const handleMoveSelect = (index: number, move: number) => {
         const newMoves = [...moves];
         newMoves[index] = move;
         setMoves(newMoves);
     };
-
-    const isCreate = mode === 'create';
 
     return (
         <div style={{
@@ -84,47 +71,54 @@ function RPSGameModal({
                         </p>
                     )}
 
-                    {isCreate && step === 'config' ? (
-                        <div>
+                    <div>
+                        <div style={{ marginBottom: '2rem' }}>
                             <label style={{ color: theme.colors.text.secondary, display: 'block', marginBottom: '0.5rem' }}>
-                                {t('rps.create_modal.entry_fee')}
+                                {isCreate ? t('rps.create_modal.entry_fee') : t('rps.accept_modal.entry_fee', 'Entry Fee')}
                             </label>
                             <input
                                 type="number"
                                 value={entryFee}
                                 onChange={e => setEntryFee(parseFloat(e.target.value))}
+                                disabled={!isCreate}
                                 style={{
                                     width: '100%', padding: '1rem', borderRadius: '8px',
-                                    backgroundColor: theme.colors.background, border: `1px solid ${theme.colors.border}`,
-                                    color: theme.colors.text.primary, fontSize: '1.1rem', marginBottom: '2rem'
+                                    backgroundColor: !isCreate ? 'rgba(255, 255, 255, 0.03)' : theme.colors.background, 
+                                    border: `1px solid ${theme.colors.border}`,
+                                    color: !isCreate ? theme.colors.text.secondary : theme.colors.text.primary, 
+                                    fontSize: '1.1rem',
+                                    cursor: !isCreate ? 'not-allowed' : 'auto'
                                 }}
                             />
-                            <button
-                                onClick={() => setStep('moves')}
-                                style={{
-                                    width: '100%', padding: '1rem', backgroundColor: theme.colors.primary.main,
-                                    color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer'
-                                }}
-                            >
-                                {t('rps.create_modal.continue_moves')}
-                            </button>
                         </div>
-                    ) : (
+
                         <div>
                             <p style={{ color: theme.colors.text.secondary, marginBottom: '1.5rem' }}>
                                 {isCreate ? t('rps.create_modal.select_moves') : t('rps.accept_modal.select_moves')}
                             </p>
 
                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '2rem' }}>
-                                {[0, 1, 2, 3, 4].map(i => (
-                                    <div key={i} style={{
-                                        width: '32px', height: '32px', borderRadius: '50%',
-                                        backgroundColor: moves[i] !== undefined ? theme.colors.success : theme.colors.border,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.8rem'
-                                    }}>
-                                        {i + 1}
-                                    </div>
-                                ))}
+                                {[0, 1, 2, 3, 4].map(i => {
+                                    const move = moves[i];
+                                    let content: React.ReactNode = i + 1;
+                                    if (move !== undefined) {
+                                        if (move === 0) content = <Circle size={16} fill="currentColor" />;
+                                        else if (move === 1) content = <FileText size={16} />;
+                                        else if (move === 2) content = <Scissors size={16} />;
+                                        else if (move === 3) content = <Zap size={16} fill="currentColor" />;
+                                        else if (move === 4) content = <Wind size={16} />;
+                                        else if (move === 5) content = <Sparkles size={16} />;
+                                    }
+                                    return (
+                                        <div key={i} style={{
+                                            width: '32px', height: '32px', borderRadius: '6px',
+                                            backgroundColor: move !== undefined ? theme.colors.success : theme.colors.border,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.8rem'
+                                        }}>
+                                            {content}
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
@@ -157,21 +151,24 @@ function RPSGameModal({
                                 opacity: moves.length === 0 ? 0.4 : 1,
                                 pointerEvents: moves.length === 0 ? 'none' : 'auto'
                             }}>
-                                {(['fury', 'serenity', 'trickery'] as const).map((s, i) => {
+                                {(['fury', 'trickery', 'serenity'] as const).map((s) => {
                                     const Icon = s === 'fury' ? Zap : s === 'serenity' ? Wind : Sparkles;
-                                    const idx = 3 + i;
+                                    const idx = s === 'fury' ? 3 : s === 'serenity' ? 4 : 5;
+                                    const isSerenityDisabled = s === 'serenity' && moves.length > 0 && moves[moves.length - 1] < 3;
                                     return (
                                         <button
                                             key={s}
                                             onClick={() => {
-                                                if (moves.length < 5) handleMoveSelect(moves.length, idx);
+                                                if (moves.length < 5 && !isSerenityDisabled) handleMoveSelect(moves.length, idx);
                                             }}
+                                            disabled={isSerenityDisabled}
                                             style={{
                                                 aspectRatio: '1', display: 'flex', flexDirection: 'column',
                                                 alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
                                                 borderRadius: '12px', border: `2px solid ${theme.colors.border}`,
                                                 backgroundColor: theme.colors.background, color: theme.colors.text.primary,
-                                                cursor: moves.length < 5 ? 'pointer' : 'not-allowed',
+                                                cursor: (moves.length < 5 && !isSerenityDisabled) ? 'pointer' : 'not-allowed',
+                                                opacity: isSerenityDisabled ? 0.4 : 1,
                                                 fontSize: '0.8rem', fontWeight: 'bold'
                                             }}
                                         >
@@ -184,24 +181,19 @@ function RPSGameModal({
 
                             <div style={{ display: 'flex', gap: '1rem' }}>
                                 {isCreate ? (
-                                    <>
-                                        <button onClick={() => setStep('config')} style={{ flex: 1, padding: '1rem', borderRadius: '8px', border: `1px solid ${theme.colors.border}`, background: 'none', color: theme.colors.text.secondary, cursor: 'pointer' }}>
-                                            {t('rps.create_modal.back')}
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                onCreate?.(entryFee, moves);
-                                            }}
-                                            disabled={moves.length < 5}
-                                            style={{
-                                                flex: 2, padding: '1rem', backgroundColor: theme.colors.success,
-                                                color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold',
-                                                cursor: moves.length === 5 ? 'pointer' : 'not-allowed', opacity: moves.length === 5 ? 1 : 0.6
-                                            }}
-                                        >
-                                            {t('rps.create_modal.create_for', { fee: entryFee })}
-                                        </button>
-                                    </>
+                                    <button
+                                        onClick={() => {
+                                            onCreate?.(entryFee, moves);
+                                        }}
+                                        disabled={moves.length < 5}
+                                        style={{
+                                            width: '100%', padding: '1rem', backgroundColor: theme.colors.success,
+                                            color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold',
+                                            cursor: moves.length === 5 ? 'pointer' : 'not-allowed', opacity: moves.length === 5 ? 1 : 0.6
+                                        }}
+                                    >
+                                        {t('rps.create_modal.create_for', { fee: entryFee })}
+                                    </button>
                                 ) : (
                                     <button
                                         onClick={() => onAccept?.(moves)}
@@ -217,7 +209,7 @@ function RPSGameModal({
                                 )}
                             </div>
                         </div>
-                    )}
+                    </div>
                 </div>
                 <StrategySidebar isMobile={isMobile} />
             </div>
@@ -296,14 +288,13 @@ export default function LobbyPage() {
     const navigate = useNavigate();
     const { t } = useTranslation();
 
-    const [challenges, setChallenges] = useState<Challenge[]>([]);
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    const { allChallenges: challenges, loading: isRefreshing } = useGames();
 
     // Modal state for RPS
     const [rpsModalState, setRpsModalState] = useState<{
         isOpen: boolean;
         mode: 'create' | 'accept';
-        challenge?: Challenge | null;
+        challenge?: EnrichedGame | null;
     }>({
         isOpen: false,
         mode: 'create',
@@ -322,45 +313,7 @@ export default function LobbyPage() {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const refreshChallenges = useCallback(async () => {
-        setIsRefreshing(true);
-        try {
-            const gameService = new GameService(connection);
-            const [rpsGames, chessGames] = await Promise.all([
-                gameService.getFormattedGamesForLobby('rps'),
-                gameService.getFormattedGamesForLobby('chess')
-            ]);
-
-            const mappedRpsGames = rpsGames
-                .filter(g => g.status === 'waiting' || (publicKey && g.players.includes(publicKey.toString())))
-                .map(g => ({ ...g, gameType: 'rps' as const }));
-
-            const mappedChessGames = chessGames
-                .filter(g => g.status === 'waiting' || (g.status === 'in_progress' && publicKey && g.players.includes(publicKey.toString())))
-                .map(g => ({ ...g, gameType: 'chess' as const }));
-
-            // Merge and sort
-            const allChallenges = [...mappedRpsGames, ...mappedChessGames];
-            // Sort by waiting first, then by lamports/buyin amount descending
-            allChallenges.sort((a, b) => {
-                if (a.status === 'waiting' && b.status !== 'waiting') return -1;
-                if (a.status !== 'waiting' && b.status === 'waiting') return 1;
-                return b.buyInSOL - a.buyInSOL;
-            });
-
-            setChallenges(allChallenges as Challenge[]);
-        } catch (e) {
-            console.error('Failed to refresh challenges:', e);
-        } finally {
-            setIsRefreshing(false);
-        }
-    }, [connection, publicKey]);
-
-    useEffect(() => {
-        refreshChallenges();
-        const interval = setInterval(refreshChallenges, 10000);
-        return () => clearInterval(interval);
-    }, [refreshChallenges]);
+    // Modals state for RPS
 
     const handleCreateRpsChallenge = async (fee: number, moves: number[]) => {
         if (!publicKey) {
@@ -537,7 +490,7 @@ export default function LobbyPage() {
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                         onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                     >
-                        <Swords size={18} /> Play Chess
+                        <Swords size={18} /> Play Idiot Chess
                     </button>
 
                     <button
@@ -566,7 +519,7 @@ export default function LobbyPage() {
                             e.currentTarget.style.borderColor = theme.colors.border;
                         }}
                     >
-                        <Computer size={18} /> Practice Chess
+                        <Computer size={18} /> Practice Idiot Chess
                     </button>
                 </div>
             </div>
@@ -592,7 +545,7 @@ export default function LobbyPage() {
                             const isMyGame = publicKey && c.players.includes(publicKey.toString());
                             const isCreator = publicKey && c.creator === publicKey.toString();
                             const isWinner = publicKey && c.winner === publicKey.toString();
-                            const isUnclaimed = c.lamports > 1000000;
+                            const isUnclaimed = (c.lamports || 0) > 1000000;
                             const isWaiting = c.status === 'waiting';
 
                             return (
