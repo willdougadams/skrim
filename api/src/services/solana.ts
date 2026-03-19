@@ -11,14 +11,8 @@ import { GameAccountDeserializer, ChessGameAccountDeserializer } from '@throwdow
 
 import fs from 'fs';
 import path from 'path';
-
-let rawProgramIds: any = {};
-try {
-    const filePath = path.join(__dirname, '../../../scripts/program-ids.json');
-    rawProgramIds = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-} catch (e) {
-    console.warn('Could not load program-ids.json, falling back to defaults', e);
-}
+import rawProgramIdsJson from '../../../scripts/program-ids.json';
+const rawProgramIds: any = rawProgramIdsJson;
 
 const network = process.env.NETWORK || 'mainnet';
 const networkKey = network === 'mainnet-beta' ? 'mainnet' : network;
