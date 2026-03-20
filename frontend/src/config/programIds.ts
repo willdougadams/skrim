@@ -13,6 +13,13 @@ function getCurrentNetwork(): Network {
     return stored as Network;
   }
 
+  // Check if there is an environment variable set
+  // @ts-ignore
+  const envNetwork = import.meta.env.VITE_SOLANA_NETWORK;
+  if (envNetwork === 'localnet' || envNetwork === 'devnet' || envNetwork === 'mainnet-beta' || envNetwork === 'custom') {
+    return envNetwork as Network;
+  }
+
   // Fallback to hostname-based detection
   const hostname = window.location.hostname;
   if (

@@ -37,6 +37,12 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
       return stored as Network;
     }
 
+    // @ts-ignore
+    const envNetwork = import.meta.env.VITE_SOLANA_NETWORK;
+    if (envNetwork === 'localnet' || envNetwork === 'devnet' || envNetwork === 'mainnet-beta' || envNetwork === 'custom') {
+      return envNetwork as Network;
+    }
+
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
