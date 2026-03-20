@@ -29,8 +29,8 @@ const GameDispatcher: React.FC = () => {
                 }
 
                 const owner = accountInfo.owner.toString();
-                const rpsProgramId = getProgramId('rps', connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'localnet').toString();
-                const chessProgramId = getProgramId('chess', connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'localnet').toString();
+                const rpsProgramId = getProgramId('rps').toString();
+                const chessProgramId = getProgramId('chess').toString();
 
                 if (owner === rpsProgramId) {
                     navigate(`/rps-game/${gameId}`);
